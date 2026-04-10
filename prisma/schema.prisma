@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  OPERATOR
+  ADMIN
+}
+
+enum ListingStatus {
+  DRAFT
+  PENDING_APPROVAL
+  ACTIVE
+  REJECTED
+  ARCHIVED
+}
+
+enum BookingStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  PAID
+  CANCELLED
+  COMPLETED
+}
+
+enum VerificationStatus {
+  NOT_STARTED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id          String    @id @default(cuid())
+  email       String    @unique
+  name        String?
+  role        Role      @default(CUSTOMER)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  listings    Listing[]
+  bookings    Booking[]
+}
+
+model Listing {
+  id          String        @id @default(cuid())
+  ownerId     String
+  title       String
+  slug        String        @unique
+  description String        @db.Text
+  city        String
+  state       String
+  dailyRate   Int
+  status      ListingStatus @default(DRAFT)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  owner       User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  bookings    Booking[]
+}
+
+model Booking {
+  id                 String             @id @default(cuid())
+  listingId          String
+  customerId         String
+  startDate          DateTime
+  endDate            DateTime
+  totalAmount        Int
+  status             BookingStatus      @default(REQUESTED)
+  verificationStatus VerificationStatus @default(NOT_STARTED)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  listing            Listing            @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  customer           User               @relation(fields: [customerId], references: [id], onDelete: Cascade)
+}
