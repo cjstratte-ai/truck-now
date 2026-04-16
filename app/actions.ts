@@ -388,6 +388,60 @@ export async function createOperatorListing(formData: FormData) {
   }
 }
 
+export async function archiveOperatorListing(formData: FormData) {
+  const session = await requireRole(["OPERATOR", "ADMIN"], "/operator");
+
+  const listingId = getString(formData, "listingId");
+  const nextStatus = getString(formData, "nextStatus");
+  const returnTo = getString(formData, "returnTo") || `/operator/listings/${listingId}`;
+
+  if (!listingId || !["ARCHIVED", "DRAFT"].includes(nextStatus)) {
+    redirect(getRedirectUrl(returnTo, "listing-save-failed"));
+  }
+
+  const prisma = await loadPrismaClient();
+
+  if (!prisma) {
+    redirect(getRedirectUrl(returnTo, nextStatus === "ARCHIVED" ? "listing-archived-demo" : "listing-restored-demo"));
+  }
+
+  try {
+    const listing = await prisma.listing.findFirst({
+      where: {
+        id: listingId,
+        ...(session.role === "OPERATOR"
+          ? {
+              owner: {
+                email: session.email,
+              },
+            }
+          : {}),
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!listing) {
+      redirect(getRedirectUrl(returnTo, "listing-save-failed"));
+    }
+
+    await prisma.listing.update({
+      where: {
+        id: listing.id,
+      },
+      data: {
+        status: nextStatus,
+      },
+    });
+
+    revalidateWorkflowPaths(listing.id);
+    redirect(getRedirectUrl(returnTo, nextStatus === "ARCHIVED" ? "listing-archived" : "listing-restored"));
+  } catch {
+    redirect(getRedirectUrl(returnTo, "listing-save-failed"));
+  }
+}
+
 export async function updateBookingStatus(formData: FormData) {
   const session = await requireRole(["OPERATOR", "ADMIN"], "/operator");
 

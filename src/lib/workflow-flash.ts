@@ -100,6 +100,22 @@ const flashMessages: Record<string, FlashNotice> = {
     tone: "error",
     text: "The new listing could not be created. Please try again.",
   },
+  "listing-archived": {
+    tone: "success",
+    text: "Listing archived and removed from the active workflow.",
+  },
+  "listing-archived-demo": {
+    tone: "success",
+    text: "Listing archive ran in demo mode. Connect a database to persist it.",
+  },
+  "listing-restored": {
+    tone: "success",
+    text: "Listing restored to draft so it can be updated and resubmitted.",
+  },
+  "listing-restored-demo": {
+    tone: "success",
+    text: "Listing restore ran in demo mode. Connect a database to persist it.",
+  },
   "booking-approved": {
     tone: "success",
     text: "Booking approved. Customer payment and next-step notifications are now ready.",

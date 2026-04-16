@@ -24,6 +24,7 @@ function getStatusClasses(status: string) {
     case "REQUESTED":
       return "bg-amber-500/15 text-amber-300";
     case "DRAFT":
+    case "ARCHIVED":
       return "bg-slate-700 text-slate-300";
     default:
       return "bg-rose-500/15 text-rose-300";

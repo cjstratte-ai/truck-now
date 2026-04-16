@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { saveOperatorListing } from "@/app/actions";
+import { archiveOperatorListing, saveOperatorListing } from "@/app/actions";
 import { requireRole } from "@/src/lib/auth";
 import { getOperatorListingDetail } from "@/src/lib/inventory";
 import { getFlashClasses, getWorkflowFlash } from "@/src/lib/workflow-flash";
@@ -16,6 +16,8 @@ function getStatusClasses(status: string) {
       return "bg-emerald-500/15 text-emerald-300";
     case "PENDING_APPROVAL":
       return "bg-amber-500/15 text-amber-300";
+    case "ARCHIVED":
+      return "bg-slate-700 text-slate-300";
     default:
       return "bg-slate-700 text-slate-300";
   }
@@ -117,6 +119,21 @@ export default async function OperatorListingDetailPage({
             >
               Open customer view
             </Link>
+            <form action={archiveOperatorListing}>
+              <input type="hidden" name="listingId" value={data.listing.id} />
+              <input type="hidden" name="returnTo" value={`/operator/listings/${data.listing.id}`} />
+              <input type="hidden" name="nextStatus" value={data.listing.status === "ARCHIVED" ? "DRAFT" : "ARCHIVED"} />
+              <button
+                type="submit"
+                className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                  data.listing.status === "ARCHIVED"
+                    ? "bg-emerald-500 text-slate-950 hover:bg-emerald-400"
+                    : "bg-slate-700 text-slate-100 hover:bg-slate-600"
+                }`}
+              >
+                {data.listing.status === "ARCHIVED" ? "Restore to draft" : "Archive listing"}
+              </button>
+            </form>
           </div>
         </section>
       </div>
@@ -220,6 +237,12 @@ export default async function OperatorListingDetailPage({
           <p className="text-xs text-slate-400">
             Saving keeps the current workflow state. Submit for review moves the listing into pending approval after the edits are saved.
           </p>
+
+          {data.listing.status === "ARCHIVED" ? (
+            <p className="text-xs text-slate-400">
+              Archived listings stay out of the renter-facing flow until you restore them to draft.
+            </p>
+          ) : null}
         </form>
       </section>
     </main>
