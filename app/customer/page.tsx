@@ -6,6 +6,10 @@ function formatCurrency(amount: number) {
   return `$${(amount / 100).toFixed(2)}`;
 }
 
+function formatVehicleType(vehicleType: string) {
+  return vehicleType.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 export default async function CustomerPage() {
   const data = await getCustomerInventoryData();
 
@@ -33,8 +37,14 @@ export default async function CustomerPage() {
             </div>
             <p className="text-sm text-orange-300">Texas listing</p>
             <h2 className="mt-2 text-xl font-semibold">{truck.title}</h2>
+            <p className="mt-2 text-sm text-slate-300">{formatVehicleType(truck.vehicleType)}</p>
             <p className="mt-2 text-slate-400">
               {truck.city}, {truck.state}
+            </p>
+            <p className="mt-2 text-sm text-slate-400">
+              {truck.passengerCapacity ? `${truck.passengerCapacity} seats` : "Passenger capacity not listed"}
+              {truck.hasRamp ? " • Ramp" : ""}
+              {truck.boxSizeFeet ? ` • ${truck.boxSizeFeet} ft box` : ""}
             </p>
             <p className="mt-3 flex-1 text-slate-300">{truck.description}</p>
             <p className="mt-4 text-lg font-medium">{formatCurrency(truck.dailyRate)}/day</p>

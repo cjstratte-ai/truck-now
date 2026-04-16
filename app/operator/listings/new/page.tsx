@@ -56,6 +56,32 @@ export default async function NewOperatorListingPage({
               />
             </label>
 
+            <label className="space-y-2 text-sm text-slate-300">
+              <span>Vehicle type</span>
+              <select
+                name="vehicleType"
+                defaultValue="OTHER"
+                className="w-full rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-slate-100 outline-none transition focus:border-orange-400"
+              >
+                <option value="PICKUP">Pickup</option>
+                <option value="BOX_TRUCK">Box truck</option>
+                <option value="CARGO_VAN">Van</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </label>
+
+            <label className="space-y-2 text-sm text-slate-300">
+              <span>Passenger capacity</span>
+              <input
+                type="number"
+                name="passengerCapacity"
+                min="1"
+                step="1"
+                placeholder="3"
+                className="w-full rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-slate-100 outline-none transition focus:border-orange-400"
+              />
+            </label>
+
             <label className="space-y-2 text-sm text-slate-300 md:col-span-2">
               <span>Description</span>
               <textarea
@@ -64,6 +90,18 @@ export default async function NewOperatorListingPage({
                 placeholder="Describe the truck, best-fit use cases, pickup expectations, and anything renters should know before booking."
                 className="w-full rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-slate-100 outline-none transition focus:border-orange-400"
                 required
+              />
+            </label>
+
+            <label className="space-y-2 text-sm text-slate-300 md:col-span-2">
+              <span>Box size (ft)</span>
+              <input
+                type="number"
+                name="boxSizeFeet"
+                min="1"
+                step="1"
+                placeholder="16"
+                className="w-full rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-slate-100 outline-none transition focus:border-orange-400"
               />
             </label>
 
@@ -109,6 +147,11 @@ export default async function NewOperatorListingPage({
                 placeholder={"https://example.com/photo-1.jpg\nhttps://example.com/photo-2.jpg"}
                 className="w-full rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-slate-100 outline-none transition focus:border-orange-400"
               />
+            </label>
+
+            <label className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-slate-300 md:col-span-2">
+              <input type="checkbox" name="hasRamp" className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-orange-400" />
+              Has ramp
             </label>
           </div>
 

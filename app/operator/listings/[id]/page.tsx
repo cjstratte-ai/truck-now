@@ -10,6 +10,10 @@ function formatCurrency(amount: number) {
   return `$${(amount / 100).toFixed(2)}`;
 }
 
+function formatVehicleType(vehicleType: string) {
+  return vehicleType.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 function getStatusClasses(status: string) {
   switch (status) {
     case "ACTIVE":
@@ -66,6 +70,24 @@ export default async function OperatorListingDetailPage({
           </div>
         </div>
         <p className="mt-6 max-w-3xl text-slate-300">{data.listing.description}</p>
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+            <p className="text-sm text-slate-400">Type</p>
+            <p className="mt-2 font-medium text-slate-100">{formatVehicleType(data.listing.vehicleType)}</p>
+          </div>
+          <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+            <p className="text-sm text-slate-400">Box size</p>
+            <p className="mt-2 font-medium text-slate-100">{data.listing.boxSizeFeet ? `${data.listing.boxSizeFeet} ft` : "N/A"}</p>
+          </div>
+          <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+            <p className="text-sm text-slate-400">Passenger capacity</p>
+            <p className="mt-2 font-medium text-slate-100">{data.listing.passengerCapacity ?? "N/A"}</p>
+          </div>
+          <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+            <p className="text-sm text-slate-400">Ramp</p>
+            <p className="mt-2 font-medium text-slate-100">{data.listing.hasRamp ? "Yes" : "No"}</p>
+          </div>
+        </div>
         <div className="mt-6 grid gap-3 md:grid-cols-2">
           {data.listing.photoUrls.length > 0 ? (
             data.listing.photoUrls.map((photoUrl, index) => (
@@ -179,6 +201,32 @@ export default async function OperatorListingDetailPage({
               />
             </label>
 
+            <label className="space-y-2 text-sm text-slate-300">
+              <span>Vehicle type</span>
+              <select
+                name="vehicleType"
+                defaultValue={data.listing.vehicleType}
+                className="w-full rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-slate-100 outline-none transition focus:border-orange-400"
+              >
+                <option value="PICKUP">Pickup</option>
+                <option value="BOX_TRUCK">Box truck</option>
+                <option value="CARGO_VAN">Van</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </label>
+
+            <label className="space-y-2 text-sm text-slate-300">
+              <span>Passenger capacity</span>
+              <input
+                type="number"
+                name="passengerCapacity"
+                min="1"
+                step="1"
+                defaultValue={data.listing.passengerCapacity ?? undefined}
+                className="w-full rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-slate-100 outline-none transition focus:border-orange-400"
+              />
+            </label>
+
             <label className="space-y-2 text-sm text-slate-300 md:col-span-2">
               <span>Description</span>
               <textarea
@@ -187,6 +235,18 @@ export default async function OperatorListingDetailPage({
                 rows={5}
                 className="w-full rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-slate-100 outline-none transition focus:border-orange-400"
                 required
+              />
+            </label>
+
+            <label className="space-y-2 text-sm text-slate-300 md:col-span-2">
+              <span>Box size (ft)</span>
+              <input
+                type="number"
+                name="boxSizeFeet"
+                min="1"
+                step="1"
+                defaultValue={data.listing.boxSizeFeet ?? undefined}
+                className="w-full rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-slate-100 outline-none transition focus:border-orange-400"
               />
             </label>
 
@@ -232,6 +292,16 @@ export default async function OperatorListingDetailPage({
                 rows={4}
                 className="w-full rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-slate-100 outline-none transition focus:border-orange-400"
               />
+            </label>
+
+            <label className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-slate-300 md:col-span-2">
+              <input
+                type="checkbox"
+                name="hasRamp"
+                defaultChecked={data.listing.hasRamp}
+                className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-orange-400"
+              />
+              Has ramp
             </label>
           </div>
 

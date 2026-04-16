@@ -11,6 +11,10 @@ function formatCurrency(amount: number) {
   return `$${(amount / 100).toFixed(2)}`;
 }
 
+function formatVehicleType(vehicleType: string) {
+  return vehicleType.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 export default async function CustomerListingDetailPage({
   params,
   searchParams,
@@ -47,6 +51,24 @@ export default async function CustomerListingDetailPage({
           <p className="text-2xl font-semibold text-orange-300">{formatCurrency(data.listing.dailyRate)}/day</p>
         </div>
         <p className="mt-6 max-w-3xl text-slate-300">{data.listing.description}</p>
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+            <p className="text-sm text-slate-400">Type</p>
+            <p className="mt-2 font-medium text-slate-100">{formatVehicleType(data.listing.vehicleType)}</p>
+          </div>
+          <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+            <p className="text-sm text-slate-400">Box size</p>
+            <p className="mt-2 font-medium text-slate-100">{data.listing.boxSizeFeet ? `${data.listing.boxSizeFeet} ft` : "N/A"}</p>
+          </div>
+          <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+            <p className="text-sm text-slate-400">Passenger capacity</p>
+            <p className="mt-2 font-medium text-slate-100">{data.listing.passengerCapacity ?? "N/A"}</p>
+          </div>
+          <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+            <p className="text-sm text-slate-400">Ramp</p>
+            <p className="mt-2 font-medium text-slate-100">{data.listing.hasRamp ? "Yes" : "No"}</p>
+          </div>
+        </div>
         <div className="mt-6 grid gap-3 md:grid-cols-2">
           {data.listing.photoUrls.length > 0 ? (
             data.listing.photoUrls.map((photoUrl, index) => (

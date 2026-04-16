@@ -77,6 +77,26 @@ function getPhotoUrls(formData: FormData, key: string) {
     .slice(0, 8);
 }
 
+function getOptionalInt(formData: FormData, key: string) {
+  const value = getString(formData, key);
+
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function getCheckbox(formData: FormData, key: string) {
+  return formData.get(key) === "on";
+}
+
 function revalidateWorkflowPaths(listingId?: string, bookingId?: string) {
   revalidatePath("/customer");
   revalidatePath("/operator");
@@ -262,15 +282,29 @@ export async function saveOperatorListing(formData: FormData) {
 
   const listingId = getString(formData, "listingId");
   const title = getString(formData, "title");
+  const vehicleType = getString(formData, "vehicleType");
   const description = getString(formData, "description");
   const city = getString(formData, "city");
   const state = getString(formData, "state").toUpperCase();
   const dailyRate = getMoneyAmount(formData, "dailyRate");
   const photoUrls = getPhotoUrls(formData, "photoUrls");
+  const boxSizeFeet = getOptionalInt(formData, "boxSizeFeet");
+  const passengerCapacity = getOptionalInt(formData, "passengerCapacity");
+  const hasRamp = getCheckbox(formData, "hasRamp");
   const intent = getString(formData, "intent");
   const returnTo = getString(formData, "returnTo") || `/operator/listings/${listingId}`;
 
-  if (!listingId || !title || !description || !city || !state || state.length !== 2 || dailyRate <= 0) {
+  if (
+    !listingId ||
+    !title ||
+    !["PICKUP", "BOX_TRUCK", "CARGO_VAN", "OTHER"].includes(vehicleType) ||
+    !description ||
+    !city ||
+    !state ||
+    state.length !== 2 ||
+    dailyRate <= 0 ||
+    (vehicleType === "BOX_TRUCK" && !boxSizeFeet)
+  ) {
     redirect(getRedirectUrl(returnTo, "listing-save-invalid"));
   }
 
@@ -311,8 +345,12 @@ export async function saveOperatorListing(formData: FormData) {
       },
       data: {
         title,
+        vehicleType,
         description,
         photoUrls,
+        boxSizeFeet,
+        passengerCapacity,
+        hasRamp,
         city,
         state,
         dailyRate,
@@ -331,15 +369,28 @@ export async function createOperatorListing(formData: FormData) {
   const session = await requireRole(["OPERATOR", "ADMIN"], "/operator/listings/new");
 
   const title = getString(formData, "title");
+  const vehicleType = getString(formData, "vehicleType");
   const description = getString(formData, "description");
   const city = getString(formData, "city");
   const state = getString(formData, "state").toUpperCase();
   const dailyRate = getMoneyAmount(formData, "dailyRate");
   const photoUrls = getPhotoUrls(formData, "photoUrls");
+  const boxSizeFeet = getOptionalInt(formData, "boxSizeFeet");
+  const passengerCapacity = getOptionalInt(formData, "passengerCapacity");
+  const hasRamp = getCheckbox(formData, "hasRamp");
   const intent = getString(formData, "intent");
   const returnTo = getString(formData, "returnTo") || "/operator/listings/new";
 
-  if (!title || !description || !city || !state || state.length !== 2 || dailyRate <= 0) {
+  if (
+    !title ||
+    !["PICKUP", "BOX_TRUCK", "CARGO_VAN", "OTHER"].includes(vehicleType) ||
+    !description ||
+    !city ||
+    !state ||
+    state.length !== 2 ||
+    dailyRate <= 0 ||
+    (vehicleType === "BOX_TRUCK" && !boxSizeFeet)
+  ) {
     redirect(getRedirectUrl(returnTo, "listing-save-invalid"));
   }
 
@@ -382,8 +433,12 @@ export async function createOperatorListing(formData: FormData) {
         ownerId: owner.id,
         title,
         slug,
+        vehicleType,
         description,
         photoUrls,
+        boxSizeFeet,
+        passengerCapacity,
+        hasRamp,
         city,
         state,
         dailyRate,

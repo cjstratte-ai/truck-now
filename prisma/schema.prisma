@@ -21,6 +21,13 @@ enum ListingStatus {
   ARCHIVED
 }
 
+enum VehicleType {
+  PICKUP
+  BOX_TRUCK
+  CARGO_VAN
+  OTHER
+}
+
 enum BookingStatus {
   REQUESTED
   APPROVED
@@ -53,8 +60,12 @@ model Listing {
   ownerId     String
   title       String
   slug        String        @unique
+  vehicleType VehicleType   @default(OTHER)
   description String        @db.Text
   photoUrls   String[]      @default([])
+  boxSizeFeet Int?
+  passengerCapacity Int?
+  hasRamp     Boolean       @default(false)
   city        String
   state       String
   dailyRate   Int

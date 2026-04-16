@@ -3,6 +3,10 @@ export type InventoryItem = {
   slug: string;
   title: string;
   photoUrls: string[];
+  vehicleType: string;
+  boxSizeFeet: number | null;
+  passengerCapacity: number | null;
+  hasRamp: boolean;
   city: string;
   state: string;
   dailyRate: number;
@@ -24,6 +28,10 @@ export type OperatorListing = {
   id: string;
   slug: string;
   title: string;
+  vehicleType: string;
+  boxSizeFeet: number | null;
+  passengerCapacity: number | null;
+  hasRamp: boolean;
   city: string;
   state: string;
   dailyRate: number;
@@ -83,6 +91,7 @@ export type OperatorBookingDetail = {
 export type AdminListingReview = {
   id: string;
   title: string;
+  vehicleType: string;
   city: string;
   state: string;
   status: string;
@@ -119,6 +128,9 @@ export type AdminListingReviewDetail = {
     ownerEmail: string;
     dailyRate: number;
     photoUrls: string[];
+    boxSizeFeet: number | null;
+    passengerCapacity: number | null;
+    hasRamp: boolean;
   };
   actionItems: string[];
   checklist: string[];
@@ -172,6 +184,10 @@ const fallbackListings: ListingRecord[] = [
       "https://placehold.co/1200x800/1e293b/f8fafc?text=Ford+F-250+Front",
       "https://placehold.co/1200x800/334155/f8fafc?text=Ford+F-250+Bed",
     ],
+    vehicleType: "PICKUP",
+    boxSizeFeet: null,
+    passengerCapacity: 5,
+    hasRamp: false,
     description: "Reliable heavy-duty truck rental in Dallas for hauling, moving, and work-site jobs.",
     city: "Dallas",
     state: "TX",
@@ -188,6 +204,10 @@ const fallbackListings: ListingRecord[] = [
       "https://placehold.co/1200x800/0f172a/f8fafc?text=Isuzu+NPR+Exterior",
       "https://placehold.co/1200x800/475569/f8fafc?text=Isuzu+NPR+Cargo+Box",
     ],
+    vehicleType: "BOX_TRUCK",
+    boxSizeFeet: 16,
+    passengerCapacity: 3,
+    hasRamp: true,
     description: "Popular Houston box truck for deliveries, business rentals, and multi-stop move days.",
     city: "Houston",
     state: "TX",
@@ -201,6 +221,10 @@ const fallbackListings: ListingRecord[] = [
     slug: "2019-ram-2500-utility-truck",
     title: "2019 Ram 2500 Utility Truck",
     photoUrls: ["https://placehold.co/1200x800/1f2937/f8fafc?text=Ram+2500+Utility+Truck"],
+    vehicleType: "PICKUP",
+    boxSizeFeet: null,
+    passengerCapacity: 5,
+    hasRamp: false,
     description: "Utility truck listing waiting on final admin approval before it can go live in Austin.",
     city: "Austin",
     state: "TX",
@@ -214,6 +238,10 @@ const fallbackListings: ListingRecord[] = [
     slug: "2022-chevy-silverado-2500hd",
     title: "2022 Chevy Silverado 2500HD",
     photoUrls: [],
+    vehicleType: "PICKUP",
+    boxSizeFeet: null,
+    passengerCapacity: 5,
+    hasRamp: false,
     description: "Draft listing that still needs photos, delivery rules, and operator notes before review.",
     city: "San Antonio",
     state: "TX",
@@ -298,6 +326,10 @@ function mapOperatorListing(listing: ListingRecord): OperatorListing {
     id: listing.id,
     slug: listing.slug,
     title: listing.title,
+    vehicleType: listing.vehicleType,
+    boxSizeFeet: listing.boxSizeFeet,
+    passengerCapacity: listing.passengerCapacity,
+    hasRamp: listing.hasRamp,
     city: listing.city,
     state: listing.state,
     dailyRate: listing.dailyRate,
@@ -342,6 +374,7 @@ function mapAdminListingReview(listing: ListingRecord): AdminListingReview {
   return {
     id: listing.id,
     title: listing.title,
+    vehicleType: listing.vehicleType,
     city: listing.city,
     state: listing.state,
     status: listing.status,
@@ -473,8 +506,12 @@ async function loadCatalog(): Promise<CatalogData> {
           id: true,
           slug: true,
           title: true,
+          vehicleType: true,
           description: true,
           photoUrls: true,
+          boxSizeFeet: true,
+          passengerCapacity: true,
+          hasRamp: true,
           city: true,
           state: true,
           dailyRate: true,
@@ -524,8 +561,12 @@ async function loadCatalog(): Promise<CatalogData> {
       id: string;
       slug: string;
       title: string;
+      vehicleType: string;
       description: string;
       photoUrls: string[];
+      boxSizeFeet: number | null;
+      passengerCapacity: number | null;
+      hasRamp: boolean;
       city: string;
       state: string;
       dailyRate: number;
@@ -563,8 +604,12 @@ async function loadCatalog(): Promise<CatalogData> {
         id: listing.id,
         slug: listing.slug,
         title: listing.title,
+        vehicleType: listing.vehicleType,
         description: listing.description,
         photoUrls: listing.photoUrls,
+        boxSizeFeet: listing.boxSizeFeet,
+        passengerCapacity: listing.passengerCapacity,
+        hasRamp: listing.hasRamp,
         city: listing.city,
         state: listing.state,
         dailyRate: listing.dailyRate,
@@ -601,11 +646,15 @@ export async function getActiveListings(): Promise<InventoryItem[]> {
 
   return listings
     .filter((listing) => listing.status === "ACTIVE")
-    .map(({ id, slug, title, photoUrls, city, state, dailyRate, description }) => ({
+    .map(({ id, slug, title, photoUrls, vehicleType, boxSizeFeet, passengerCapacity, hasRamp, city, state, dailyRate, description }) => ({
       id,
       slug,
       title,
       photoUrls,
+      vehicleType,
+      boxSizeFeet,
+      passengerCapacity,
+      hasRamp,
       city,
       state,
       dailyRate,
@@ -620,11 +669,15 @@ export async function getCustomerInventoryData(): Promise<CustomerInventoryData>
     sourceLabel: getSourceLabel(source, "inventory"),
     listings: listings
       .filter((listing) => listing.status === "ACTIVE")
-      .map(({ id, slug, title, photoUrls, city, state, dailyRate, description }) => ({
+      .map(({ id, slug, title, photoUrls, vehicleType, boxSizeFeet, passengerCapacity, hasRamp, city, state, dailyRate, description }) => ({
         id,
         slug,
         title,
         photoUrls,
+        vehicleType,
+        boxSizeFeet,
+        passengerCapacity,
+        hasRamp,
         city,
         state,
         dailyRate,
@@ -648,6 +701,10 @@ export async function getCustomerListingDetail(id: string): Promise<CustomerList
       slug: listing.slug,
       title: listing.title,
       photoUrls: listing.photoUrls,
+      vehicleType: listing.vehicleType,
+      boxSizeFeet: listing.boxSizeFeet,
+      passengerCapacity: listing.passengerCapacity,
+      hasRamp: listing.hasRamp,
       city: listing.city,
       state: listing.state,
       dailyRate: listing.dailyRate,
@@ -703,6 +760,10 @@ export async function getOperatorListingDetail(id: string, ownerEmail?: string):
       description: listing.description,
       ownerName: listing.ownerName,
       photoUrls: listing.photoUrls,
+      vehicleType: listing.vehicleType,
+      boxSizeFeet: listing.boxSizeFeet,
+      passengerCapacity: listing.passengerCapacity,
+      hasRamp: listing.hasRamp,
     },
     stats: {
       recentBookings: relatedBookings.length,
@@ -774,6 +835,10 @@ export async function getAdminListingReviewDetail(id: string): Promise<AdminList
       ownerEmail: listing.ownerEmail,
       dailyRate: listing.dailyRate,
       photoUrls: listing.photoUrls,
+      vehicleType: listing.vehicleType,
+      boxSizeFeet: listing.boxSizeFeet,
+      passengerCapacity: listing.passengerCapacity,
+      hasRamp: listing.hasRamp,
     },
     actionItems: getAdminListingActionItems(listing.status),
     checklist: [
