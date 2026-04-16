@@ -56,6 +56,30 @@ const flashMessages: Record<string, FlashNotice> = {
     tone: "error",
     text: "The listing review action failed. Please try again.",
   },
+  "listing-saved": {
+    tone: "success",
+    text: "Listing changes saved.",
+  },
+  "listing-saved-demo": {
+    tone: "success",
+    text: "Listing edit ran in demo mode. Connect a database to persist it.",
+  },
+  "listing-submitted": {
+    tone: "success",
+    text: "Listing updated and sent back into the approval queue.",
+  },
+  "listing-submitted-demo": {
+    tone: "success",
+    text: "Listing submit-for-review ran in demo mode. Connect a database to persist it.",
+  },
+  "listing-save-invalid": {
+    tone: "error",
+    text: "Please fill out the title, description, location, and daily rate before saving the listing.",
+  },
+  "listing-save-failed": {
+    tone: "error",
+    text: "The listing changes did not save. Please try again.",
+  },
   "booking-approved": {
     tone: "success",
     text: "Booking approved. Customer payment and next-step notifications are now ready.",

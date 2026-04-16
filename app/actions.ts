@@ -37,6 +37,22 @@ function getRedirectUrl(path: string, message: string) {
   return `${url.pathname}${url.search}`;
 }
 
+function getMoneyAmount(formData: FormData, key: string) {
+  const value = getString(formData, key);
+
+  if (!value) {
+    return Number.NaN;
+  }
+
+  const parsed = Number.parseFloat(value);
+
+  if (!Number.isFinite(parsed)) {
+    return Number.NaN;
+  }
+
+  return Math.round(parsed * 100);
+}
+
 function revalidateWorkflowPaths(listingId?: string, bookingId?: string) {
   revalidatePath("/customer");
   revalidatePath("/operator");
@@ -214,6 +230,74 @@ export async function reviewListing(formData: FormData) {
     redirect(getRedirectUrl(returnTo, nextStatus === "ACTIVE" ? "listing-approved" : "listing-rejected"));
   } catch {
     redirect(getRedirectUrl(returnTo, "listing-review-failed"));
+  }
+}
+
+export async function saveOperatorListing(formData: FormData) {
+  const session = await requireRole(["OPERATOR", "ADMIN"], "/operator");
+
+  const listingId = getString(formData, "listingId");
+  const title = getString(formData, "title");
+  const description = getString(formData, "description");
+  const city = getString(formData, "city");
+  const state = getString(formData, "state").toUpperCase();
+  const dailyRate = getMoneyAmount(formData, "dailyRate");
+  const intent = getString(formData, "intent");
+  const returnTo = getString(formData, "returnTo") || `/operator/listings/${listingId}`;
+
+  if (!listingId || !title || !description || !city || !state || state.length !== 2 || dailyRate <= 0) {
+    redirect(getRedirectUrl(returnTo, "listing-save-invalid"));
+  }
+
+  const prisma = await loadPrismaClient();
+
+  if (!prisma) {
+    redirect(getRedirectUrl(returnTo, intent === "submit" ? "listing-submitted-demo" : "listing-saved-demo"));
+  }
+
+  try {
+    const listing = await prisma.listing.findFirst({
+      where: {
+        id: listingId,
+        ...(session.role === "OPERATOR"
+          ? {
+              owner: {
+                email: session.email,
+              },
+            }
+          : {}),
+      },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+
+    if (!listing) {
+      redirect(getRedirectUrl(returnTo, "listing-save-failed"));
+    }
+
+    const nextStatus =
+      intent === "submit" ? "PENDING_APPROVAL" : listing.status === "REJECTED" ? "DRAFT" : listing.status;
+
+    await prisma.listing.update({
+      where: {
+        id: listing.id,
+      },
+      data: {
+        title,
+        description,
+        city,
+        state,
+        dailyRate,
+        status: nextStatus,
+      },
+    });
+
+    revalidateWorkflowPaths(listing.id);
+    redirect(getRedirectUrl(returnTo, intent === "submit" ? "listing-submitted" : "listing-saved"));
+  } catch {
+    redirect(getRedirectUrl(returnTo, "listing-save-failed"));
   }
 }
 
