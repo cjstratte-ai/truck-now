@@ -100,6 +100,16 @@ export default async function NewOperatorListingPage({
                 required
               />
             </label>
+
+            <label className="space-y-2 text-sm text-slate-300 md:col-span-2">
+              <span>Photo URLs</span>
+              <textarea
+                name="photoUrls"
+                rows={4}
+                placeholder={"https://example.com/photo-1.jpg\nhttps://example.com/photo-2.jpg"}
+                className="w-full rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-slate-100 outline-none transition focus:border-orange-400"
+              />
+            </label>
           </div>
 
           <div className="flex flex-wrap gap-3">
@@ -124,6 +134,7 @@ export default async function NewOperatorListingPage({
           <p className="text-xs text-slate-400">
             Draft keeps the listing private to the operator workflow. Submit for review creates it and places it into pending approval.
           </p>
+          <p className="text-xs text-slate-400">Add one photo URL per line. This keeps the gallery lightweight until direct upload support lands.</p>
         </form>
       </section>
     </main>

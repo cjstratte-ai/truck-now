@@ -2,6 +2,7 @@ export type InventoryItem = {
   id: string;
   slug: string;
   title: string;
+  photoUrls: string[];
   city: string;
   state: string;
   dailyRate: number;
@@ -60,6 +61,7 @@ export type OperatorListingDetail = {
   listing: OperatorListing & {
     description: string;
     ownerName: string;
+    photoUrls: string[];
   };
   stats: {
     recentBookings: number;
@@ -116,6 +118,7 @@ export type AdminListingReviewDetail = {
     ownerName: string;
     ownerEmail: string;
     dailyRate: number;
+    photoUrls: string[];
   };
   actionItems: string[];
   checklist: string[];
@@ -165,6 +168,10 @@ const fallbackListings: ListingRecord[] = [
     id: "listing-1",
     slug: "2021-ford-f250-work-truck",
     title: "2021 Ford F-250 Work Truck",
+    photoUrls: [
+      "https://placehold.co/1200x800/1e293b/f8fafc?text=Ford+F-250+Front",
+      "https://placehold.co/1200x800/334155/f8fafc?text=Ford+F-250+Bed",
+    ],
     description: "Reliable heavy-duty truck rental in Dallas for hauling, moving, and work-site jobs.",
     city: "Dallas",
     state: "TX",
@@ -177,6 +184,10 @@ const fallbackListings: ListingRecord[] = [
     id: "listing-2",
     slug: "2020-isuzu-npr-box-truck",
     title: "2020 Isuzu NPR Box Truck",
+    photoUrls: [
+      "https://placehold.co/1200x800/0f172a/f8fafc?text=Isuzu+NPR+Exterior",
+      "https://placehold.co/1200x800/475569/f8fafc?text=Isuzu+NPR+Cargo+Box",
+    ],
     description: "Popular Houston box truck for deliveries, business rentals, and multi-stop move days.",
     city: "Houston",
     state: "TX",
@@ -189,6 +200,7 @@ const fallbackListings: ListingRecord[] = [
     id: "listing-3",
     slug: "2019-ram-2500-utility-truck",
     title: "2019 Ram 2500 Utility Truck",
+    photoUrls: ["https://placehold.co/1200x800/1f2937/f8fafc?text=Ram+2500+Utility+Truck"],
     description: "Utility truck listing waiting on final admin approval before it can go live in Austin.",
     city: "Austin",
     state: "TX",
@@ -201,6 +213,7 @@ const fallbackListings: ListingRecord[] = [
     id: "listing-4",
     slug: "2022-chevy-silverado-2500hd",
     title: "2022 Chevy Silverado 2500HD",
+    photoUrls: [],
     description: "Draft listing that still needs photos, delivery rules, and operator notes before review.",
     city: "San Antonio",
     state: "TX",
@@ -461,6 +474,7 @@ async function loadCatalog(): Promise<CatalogData> {
           slug: true,
           title: true,
           description: true,
+          photoUrls: true,
           city: true,
           state: true,
           dailyRate: true,
@@ -511,6 +525,7 @@ async function loadCatalog(): Promise<CatalogData> {
       slug: string;
       title: string;
       description: string;
+      photoUrls: string[];
       city: string;
       state: string;
       dailyRate: number;
@@ -549,6 +564,7 @@ async function loadCatalog(): Promise<CatalogData> {
         slug: listing.slug,
         title: listing.title,
         description: listing.description,
+        photoUrls: listing.photoUrls,
         city: listing.city,
         state: listing.state,
         dailyRate: listing.dailyRate,
@@ -585,10 +601,11 @@ export async function getActiveListings(): Promise<InventoryItem[]> {
 
   return listings
     .filter((listing) => listing.status === "ACTIVE")
-    .map(({ id, slug, title, city, state, dailyRate, description }) => ({
+    .map(({ id, slug, title, photoUrls, city, state, dailyRate, description }) => ({
       id,
       slug,
       title,
+      photoUrls,
       city,
       state,
       dailyRate,
@@ -603,10 +620,11 @@ export async function getCustomerInventoryData(): Promise<CustomerInventoryData>
     sourceLabel: getSourceLabel(source, "inventory"),
     listings: listings
       .filter((listing) => listing.status === "ACTIVE")
-      .map(({ id, slug, title, city, state, dailyRate, description }) => ({
+      .map(({ id, slug, title, photoUrls, city, state, dailyRate, description }) => ({
         id,
         slug,
         title,
+        photoUrls,
         city,
         state,
         dailyRate,
@@ -629,6 +647,7 @@ export async function getCustomerListingDetail(id: string): Promise<CustomerList
       id: listing.id,
       slug: listing.slug,
       title: listing.title,
+      photoUrls: listing.photoUrls,
       city: listing.city,
       state: listing.state,
       dailyRate: listing.dailyRate,
@@ -683,6 +702,7 @@ export async function getOperatorListingDetail(id: string, ownerEmail?: string):
       ...mapOperatorListing(listing),
       description: listing.description,
       ownerName: listing.ownerName,
+      photoUrls: listing.photoUrls,
     },
     stats: {
       recentBookings: relatedBookings.length,
@@ -753,6 +773,7 @@ export async function getAdminListingReviewDetail(id: string): Promise<AdminList
       ownerName: listing.ownerName,
       ownerEmail: listing.ownerEmail,
       dailyRate: listing.dailyRate,
+      photoUrls: listing.photoUrls,
     },
     actionItems: getAdminListingActionItems(listing.status),
     checklist: [

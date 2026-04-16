@@ -63,6 +63,20 @@ function slugify(value: string) {
   return slug || "listing";
 }
 
+function getPhotoUrls(formData: FormData, key: string) {
+  const value = getString(formData, key);
+
+  if (!value) {
+    return [] as string[];
+  }
+
+  return value
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter((item) => /^https?:\/\//i.test(item))
+    .slice(0, 8);
+}
+
 function revalidateWorkflowPaths(listingId?: string, bookingId?: string) {
   revalidatePath("/customer");
   revalidatePath("/operator");
@@ -252,6 +266,7 @@ export async function saveOperatorListing(formData: FormData) {
   const city = getString(formData, "city");
   const state = getString(formData, "state").toUpperCase();
   const dailyRate = getMoneyAmount(formData, "dailyRate");
+  const photoUrls = getPhotoUrls(formData, "photoUrls");
   const intent = getString(formData, "intent");
   const returnTo = getString(formData, "returnTo") || `/operator/listings/${listingId}`;
 
@@ -297,6 +312,7 @@ export async function saveOperatorListing(formData: FormData) {
       data: {
         title,
         description,
+        photoUrls,
         city,
         state,
         dailyRate,
@@ -319,6 +335,7 @@ export async function createOperatorListing(formData: FormData) {
   const city = getString(formData, "city");
   const state = getString(formData, "state").toUpperCase();
   const dailyRate = getMoneyAmount(formData, "dailyRate");
+  const photoUrls = getPhotoUrls(formData, "photoUrls");
   const intent = getString(formData, "intent");
   const returnTo = getString(formData, "returnTo") || "/operator/listings/new";
 
@@ -366,6 +383,7 @@ export async function createOperatorListing(formData: FormData) {
         title,
         slug,
         description,
+        photoUrls,
         city,
         state,
         dailyRate,

@@ -54,6 +54,7 @@ model Listing {
   title       String
   slug        String        @unique
   description String        @db.Text
+  photoUrls   String[]      @default([])
   city        String
   state       String
   dailyRate   Int

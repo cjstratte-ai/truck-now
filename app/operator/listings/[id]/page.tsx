@@ -66,6 +66,19 @@ export default async function OperatorListingDetailPage({
           </div>
         </div>
         <p className="mt-6 max-w-3xl text-slate-300">{data.listing.description}</p>
+        <div className="mt-6 grid gap-3 md:grid-cols-2">
+          {data.listing.photoUrls.length > 0 ? (
+            data.listing.photoUrls.map((photoUrl, index) => (
+              <div key={photoUrl} className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/60">
+                <img src={photoUrl} alt={`${data.listing.title} photo ${index + 1}`} className="h-64 w-full object-cover" />
+              </div>
+            ))
+          ) : (
+            <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-slate-700 bg-slate-950/40 text-sm text-slate-400 md:col-span-2">
+              No listing photos yet
+            </div>
+          )}
+        </div>
         {isDemoMode ? (
           <p className="mt-4 text-sm text-slate-400">Demo mode is active here, so listing edits validate and redirect but do not persist yet.</p>
         ) : null}
@@ -210,6 +223,16 @@ export default async function OperatorListingDetailPage({
                 required
               />
             </label>
+
+            <label className="space-y-2 text-sm text-slate-300 md:col-span-2">
+              <span>Photo URLs</span>
+              <textarea
+                name="photoUrls"
+                defaultValue={data.listing.photoUrls.join("\n")}
+                rows={4}
+                className="w-full rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-slate-100 outline-none transition focus:border-orange-400"
+              />
+            </label>
           </div>
 
           <div className="flex flex-wrap gap-3">
@@ -237,6 +260,7 @@ export default async function OperatorListingDetailPage({
           <p className="text-xs text-slate-400">
             Saving keeps the current workflow state. Submit for review moves the listing into pending approval after the edits are saved.
           </p>
+          <p className="text-xs text-slate-400">Add one photo URL per line. Invalid or blank lines are ignored.</p>
 
           {data.listing.status === "ARCHIVED" ? (
             <p className="text-xs text-slate-400">
