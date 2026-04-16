@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { updateBookingStatus } from "@/app/actions";
+import { requireRole } from "@/src/lib/auth";
 import { getOperatorBookingDetail } from "@/src/lib/inventory";
 import { getFlashClasses, getWorkflowFlash } from "@/src/lib/workflow-flash";
 
@@ -36,6 +37,7 @@ export default async function OperatorBookingDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ message?: string | string[] }>;
 }) {
+  await requireRole(["OPERATOR", "ADMIN"], "/operator");
   const { id } = await params;
   const resolvedSearchParams = await searchParams;
   const data = await getOperatorBookingDetail(id);

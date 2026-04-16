@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { requireRole } from "@/src/lib/auth";
 import { getOperatorListingDetail } from "@/src/lib/inventory";
 
 function formatCurrency(amount: number) {
@@ -19,6 +20,7 @@ function getStatusClasses(status: string) {
 }
 
 export default async function OperatorListingDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireRole(["OPERATOR", "ADMIN"], "/operator");
   const { id } = await params;
   const data = await getOperatorListingDetail(id);
 

@@ -13,10 +13,17 @@ export default function HomePage() {
         </h1>
 
         <p className="max-w-2xl text-lg text-slate-300">
-          Trucks Now helps renters find trucks fast and helps owners market, manage, and monetize their fleets.
+          Trucks Now helps renters find trucks fast and helps owners market, manage, and monetize their fleets. Operator
+          and admin workflows now sit behind session-based role gating.
         </p>
 
         <div className="flex flex-wrap gap-4">
+          <Link
+            href="/login"
+            className="rounded-lg border border-orange-500/40 px-5 py-3 font-semibold text-orange-300"
+          >
+            Sign in
+          </Link>
           <Link
             href="/customer"
             className="rounded-lg bg-orange-500 px-5 py-3 font-semibold text-black"

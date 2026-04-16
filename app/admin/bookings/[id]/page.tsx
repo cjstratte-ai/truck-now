@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { updateBookingStatus, updateVerificationStatus } from "@/app/actions";
+import { requireRole } from "@/src/lib/auth";
 import { getAdminBookingReviewDetail } from "@/src/lib/inventory";
 import { getFlashClasses, getWorkflowFlash } from "@/src/lib/workflow-flash";
 
@@ -36,6 +37,7 @@ export default async function AdminBookingReviewPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ message?: string | string[] }>;
 }) {
+  await requireRole(["ADMIN"], "/admin");
   const { id } = await params;
   const resolvedSearchParams = await searchParams;
   const data = await getAdminBookingReviewDetail(id);

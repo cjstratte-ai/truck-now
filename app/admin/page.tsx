@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { requireRole } from "@/src/lib/auth";
 import { getAdminDashboardData } from "@/src/lib/inventory";
 
 function formatCurrency(amount: number) {
@@ -25,6 +26,7 @@ function itemLabel(count: number) {
 }
 
 export default async function AdminPage() {
+  await requireRole(["ADMIN"], "/admin");
   const data = await getAdminDashboardData();
 
   return (

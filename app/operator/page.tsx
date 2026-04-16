@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { requireRole } from "@/src/lib/auth";
 import { getOperatorDashboardData } from "@/src/lib/inventory";
 
 function formatCurrency(amount: number) {
@@ -30,6 +31,7 @@ function getStatusClasses(status: string) {
 }
 
 export default async function OperatorPage() {
+  await requireRole(["OPERATOR", "ADMIN"], "/operator");
   const data = await getOperatorDashboardData();
 
   return (

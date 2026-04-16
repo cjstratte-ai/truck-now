@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { clearSession, createSession, normalizeNextPath, requireRole } from "@/src/lib/auth";
+
 async function loadPrismaClient() {
   if (!process.env.DATABASE_URL) {
     return null;
@@ -49,6 +51,30 @@ function revalidateWorkflowPaths(listingId?: string, bookingId?: string) {
     revalidatePath(`/operator/bookings/${bookingId}`);
     revalidatePath(`/admin/bookings/${bookingId}`);
   }
+}
+
+export async function signIn(formData: FormData) {
+  const name = getString(formData, "name");
+  const email = getString(formData, "email").toLowerCase();
+  const role = getString(formData, "role");
+  const nextPath = getString(formData, "next");
+
+  if (!name || !email || !["CUSTOMER", "OPERATOR", "ADMIN"].includes(role)) {
+    redirect("/login?reason=invalid");
+  }
+
+  await createSession({
+    name,
+    email,
+    role: role as "CUSTOMER" | "OPERATOR" | "ADMIN",
+  });
+
+  redirect(normalizeNextPath(nextPath, role as "CUSTOMER" | "OPERATOR" | "ADMIN"));
+}
+
+export async function signOut() {
+  await clearSession();
+  redirect("/login?reason=signed-out");
 }
 
 export async function createBookingRequest(formData: FormData) {
@@ -130,6 +156,8 @@ export async function createBookingRequest(formData: FormData) {
 }
 
 export async function reviewListing(formData: FormData) {
+  await requireRole(["ADMIN"], "/admin");
+
   const listingId = getString(formData, "listingId");
   const nextStatus = getString(formData, "nextStatus");
   const returnTo = `/admin/listings/${listingId}`;
@@ -162,6 +190,8 @@ export async function reviewListing(formData: FormData) {
 }
 
 export async function updateBookingStatus(formData: FormData) {
+  await requireRole(["OPERATOR", "ADMIN"], "/operator");
+
   const bookingId = getString(formData, "bookingId");
   const nextStatus = getString(formData, "nextStatus");
   const returnTo = getString(formData, "returnTo") || `/operator/bookings/${bookingId}`;
@@ -209,6 +239,8 @@ export async function updateBookingStatus(formData: FormData) {
 }
 
 export async function updateVerificationStatus(formData: FormData) {
+  await requireRole(["ADMIN"], "/admin");
+
   const bookingId = getString(formData, "bookingId");
   const nextStatus = getString(formData, "nextStatus");
   const returnTo = getString(formData, "returnTo") || `/admin/bookings/${bookingId}`;

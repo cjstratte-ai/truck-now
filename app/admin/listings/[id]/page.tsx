@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { reviewListing } from "@/app/actions";
+import { requireRole } from "@/src/lib/auth";
 import { getAdminListingReviewDetail } from "@/src/lib/inventory";
 import { getFlashClasses, getWorkflowFlash } from "@/src/lib/workflow-flash";
 
@@ -28,6 +29,7 @@ export default async function AdminListingReviewPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ message?: string | string[] }>;
 }) {
+  await requireRole(["ADMIN"], "/admin");
   const { id } = await params;
   const resolvedSearchParams = await searchParams;
   const data = await getAdminListingReviewDetail(id);
