@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { getAdminDashboardData } from "@/src/lib/inventory";
 
 function formatCurrency(amount: number) {
@@ -18,18 +20,21 @@ function getStatusClasses(status: string) {
   }
 }
 
+function itemLabel(count: number) {
+  return `${count} ${count === 1 ? "item" : "items"}`;
+}
+
 export default async function AdminPage() {
   const data = await getAdminDashboardData();
 
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-6 py-16 text-white">
       <div className="mb-10">
-        <span className="rounded-full bg-orange-500/20 px-3 py-1 text-sm text-orange-300">
-          {data.sourceLabel}
-        </span>
+        <span className="rounded-full bg-orange-500/20 px-3 py-1 text-sm text-orange-300">{data.sourceLabel}</span>
         <h1 className="mt-4 text-4xl font-bold">Admin portal</h1>
         <p className="mt-3 max-w-2xl text-slate-300">
-          Review listings, booking requests, and verification work without leaving one screen.
+          Review listings, booking requests, and verification work. Each queue item now opens into a dedicated review
+          page so the team has a clear next step.
         </p>
       </div>
 
@@ -56,7 +61,7 @@ export default async function AdminPage() {
         <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">Listing review</h2>
-            <span className="text-sm text-slate-400">{data.listingReviewQueue.length} items</span>
+            <span className="text-sm text-slate-400">{itemLabel(data.listingReviewQueue.length)}</span>
           </div>
 
           <div className="mt-4 space-y-3">
@@ -71,6 +76,15 @@ export default async function AdminPage() {
                 <p className="mt-2 text-sm text-slate-400">
                   {listing.city}, {listing.state}
                 </p>
+
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <Link
+                    href={`/admin/listings/${listing.id}`}
+                    className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
+                  >
+                    Open review
+                  </Link>
+                </div>
               </div>
             ))}
           </div>
@@ -79,7 +93,7 @@ export default async function AdminPage() {
         <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">Booking review</h2>
-            <span className="text-sm text-slate-400">{data.bookingReviewQueue.length} items</span>
+            <span className="text-sm text-slate-400">{itemLabel(data.bookingReviewQueue.length)}</span>
           </div>
 
           <div className="mt-4 space-y-3">
@@ -93,6 +107,15 @@ export default async function AdminPage() {
                 </div>
                 <p className="mt-2 text-sm text-slate-400">{booking.customerName}</p>
                 <p className="mt-3 text-sm font-medium text-slate-200">{formatCurrency(booking.totalAmount)}</p>
+
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <Link
+                    href={`/admin/bookings/${booking.id}`}
+                    className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
+                  >
+                    Review request
+                  </Link>
+                </div>
               </div>
             ))}
           </div>
@@ -101,7 +124,7 @@ export default async function AdminPage() {
         <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">Verification queue</h2>
-            <span className="text-sm text-slate-400">{data.verificationQueue.length} items</span>
+            <span className="text-sm text-slate-400">{itemLabel(data.verificationQueue.length)}</span>
           </div>
 
           <div className="mt-4 space-y-3">
@@ -117,6 +140,15 @@ export default async function AdminPage() {
                 </div>
                 <p className="mt-2 text-sm text-slate-400">{booking.listingTitle}</p>
                 <p className="mt-3 text-sm font-medium text-slate-200">{formatCurrency(booking.totalAmount)}</p>
+
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <Link
+                    href={`/admin/bookings/${booking.id}`}
+                    className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
+                  >
+                    Check verification
+                  </Link>
+                </div>
               </div>
             ))}
           </div>

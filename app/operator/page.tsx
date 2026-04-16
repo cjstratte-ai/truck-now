@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { getOperatorDashboardData } from "@/src/lib/inventory";
 
 function formatCurrency(amount: number) {
@@ -34,12 +36,11 @@ export default async function OperatorPage() {
     <main className="mx-auto min-h-screen max-w-6xl px-6 py-16 text-white">
       <div className="mb-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <span className="rounded-full bg-orange-500/20 px-3 py-1 text-sm text-orange-300">
-            {data.sourceLabel}
-          </span>
+          <span className="rounded-full bg-orange-500/20 px-3 py-1 text-sm text-orange-300">{data.sourceLabel}</span>
           <h1 className="mt-4 text-4xl font-bold">Operator portal</h1>
           <p className="mt-3 max-w-2xl text-slate-300">
-            Manage live trucks, watch booking requests, and keep a quick pulse on revenue potential.
+            Manage live trucks, watch booking requests, and move into item-level workflow pages when something needs
+            attention.
           </p>
         </div>
       </div>
@@ -78,20 +79,37 @@ export default async function OperatorPage() {
             {data.listings.map((listing) => (
               <div
                 key={listing.id}
-                className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-950/60 p-4 md:flex-row md:items-center md:justify-between"
+                className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-950/60 p-4"
               >
-                <div>
-                  <h3 className="font-semibold">{listing.title}</h3>
-                  <p className="mt-1 text-sm text-slate-400">
-                    {listing.city}, {listing.state}
-                  </p>
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h3 className="font-semibold">{listing.title}</h3>
+                    <p className="mt-1 text-sm text-slate-400">
+                      {listing.city}, {listing.state}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(listing.status)}`}>
+                      {listing.status.replaceAll("_", " ")}
+                    </span>
+                    <span className="text-sm font-medium text-slate-200">{formatCurrency(listing.dailyRate)}/day</span>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(listing.status)}`}>
-                    {listing.status.replaceAll("_", " ")}
-                  </span>
-                  <span className="text-sm font-medium text-slate-200">{formatCurrency(listing.dailyRate)}/day</span>
+                <div className="flex flex-wrap gap-3">
+                  <Link
+                    href={`/operator/listings/${listing.id}`}
+                    className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
+                  >
+                    Open workflow
+                  </Link>
+                  <Link
+                    href={`/customer/listings/${listing.id}`}
+                    className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500"
+                  >
+                    Open customer view
+                  </Link>
                 </div>
               </div>
             ))}
@@ -124,6 +142,21 @@ export default async function OperatorPage() {
                     Verification: <span className="text-slate-200">{booking.verificationStatus.replaceAll("_", " ")}</span>
                   </span>
                   <span className="font-medium text-slate-200">{formatCurrency(booking.totalAmount)}</span>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <Link
+                    href={`/operator/bookings/${booking.id}`}
+                    className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
+                  >
+                    Review booking
+                  </Link>
+                  <Link
+                    href={`/operator/listings/${booking.listingId}`}
+                    className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500"
+                  >
+                    Open listing
+                  </Link>
                 </div>
               </div>
             ))}
