@@ -53,6 +53,16 @@ function getMoneyAmount(formData: FormData, key: string) {
   return Math.round(parsed * 100);
 }
 
+function slugify(value: string) {
+  const slug = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+
+  return slug || "listing";
+}
+
 function revalidateWorkflowPaths(listingId?: string, bookingId?: string) {
   revalidatePath("/customer");
   revalidatePath("/operator");
@@ -298,6 +308,83 @@ export async function saveOperatorListing(formData: FormData) {
     redirect(getRedirectUrl(returnTo, intent === "submit" ? "listing-submitted" : "listing-saved"));
   } catch {
     redirect(getRedirectUrl(returnTo, "listing-save-failed"));
+  }
+}
+
+export async function createOperatorListing(formData: FormData) {
+  const session = await requireRole(["OPERATOR", "ADMIN"], "/operator/listings/new");
+
+  const title = getString(formData, "title");
+  const description = getString(formData, "description");
+  const city = getString(formData, "city");
+  const state = getString(formData, "state").toUpperCase();
+  const dailyRate = getMoneyAmount(formData, "dailyRate");
+  const intent = getString(formData, "intent");
+  const returnTo = getString(formData, "returnTo") || "/operator/listings/new";
+
+  if (!title || !description || !city || !state || state.length !== 2 || dailyRate <= 0) {
+    redirect(getRedirectUrl(returnTo, "listing-save-invalid"));
+  }
+
+  const prisma = await loadPrismaClient();
+
+  if (!prisma) {
+    redirect(getRedirectUrl(returnTo, intent === "submit" ? "listing-created-submitted-demo" : "listing-created-demo"));
+  }
+
+  try {
+    const owner = await prisma.user.upsert({
+      where: {
+        email: session.email,
+      },
+      update: {
+        name: session.name,
+        role: session.role,
+      },
+      create: {
+        email: session.email,
+        name: session.name,
+        role: session.role,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const baseSlug = slugify(title);
+    let slug = baseSlug;
+    let suffix = 2;
+
+    while (await prisma.listing.findUnique({ where: { slug }, select: { id: true } })) {
+      slug = `${baseSlug}-${suffix}`;
+      suffix += 1;
+    }
+
+    const listing = await prisma.listing.create({
+      data: {
+        ownerId: owner.id,
+        title,
+        slug,
+        description,
+        city,
+        state,
+        dailyRate,
+        status: intent === "submit" ? "PENDING_APPROVAL" : "DRAFT",
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    revalidateWorkflowPaths(listing.id);
+    redirect(
+      getRedirectUrl(
+        `/operator/listings/${listing.id}`,
+        intent === "submit" ? "listing-created-submitted" : "listing-created",
+      ),
+    );
+  } catch {
+    redirect(getRedirectUrl(returnTo, "listing-create-failed"));
   }
 }
 

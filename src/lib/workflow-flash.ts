@@ -80,6 +80,26 @@ const flashMessages: Record<string, FlashNotice> = {
     tone: "error",
     text: "The listing changes did not save. Please try again.",
   },
+  "listing-created": {
+    tone: "success",
+    text: "Listing created and saved as a draft.",
+  },
+  "listing-created-demo": {
+    tone: "success",
+    text: "Listing creation ran in demo mode. Connect a database to persist it.",
+  },
+  "listing-created-submitted": {
+    tone: "success",
+    text: "Listing created and sent into the approval queue.",
+  },
+  "listing-created-submitted-demo": {
+    tone: "success",
+    text: "Listing creation and review submission ran in demo mode. Connect a database to persist it.",
+  },
+  "listing-create-failed": {
+    tone: "error",
+    text: "The new listing could not be created. Please try again.",
+  },
   "booking-approved": {
     tone: "success",
     text: "Booking approved. Customer payment and next-step notifications are now ready.",

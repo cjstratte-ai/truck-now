@@ -45,6 +45,12 @@ export default async function OperatorPage() {
             attention.
           </p>
         </div>
+        <Link
+          href="/operator/listings/new"
+          className="inline-flex rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
+        >
+          Add listing
+        </Link>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -78,43 +84,49 @@ export default async function OperatorPage() {
           </div>
 
           <div className="mt-4 space-y-3">
-            {data.listings.map((listing) => (
-              <div
-                key={listing.id}
-                className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-950/60 p-4"
-              >
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <h3 className="font-semibold">{listing.title}</h3>
-                    <p className="mt-1 text-sm text-slate-400">
-                      {listing.city}, {listing.state}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(listing.status)}`}>
-                      {listing.status.replaceAll("_", " ")}
-                    </span>
-                    <span className="text-sm font-medium text-slate-200">{formatCurrency(listing.dailyRate)}/day</span>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  <Link
-                    href={`/operator/listings/${listing.id}`}
-                    className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
-                  >
-                    Open workflow
-                  </Link>
-                  <Link
-                    href={`/customer/listings/${listing.id}`}
-                    className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500"
-                  >
-                    Open customer view
-                  </Link>
-                </div>
+            {data.listings.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/40 p-6 text-sm text-slate-300">
+                No listings yet in this operator scope. Create one to start the workflow.
               </div>
-            ))}
+            ) : (
+              data.listings.map((listing) => (
+                <div
+                  key={listing.id}
+                  className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-950/60 p-4"
+                >
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <h3 className="font-semibold">{listing.title}</h3>
+                      <p className="mt-1 text-sm text-slate-400">
+                        {listing.city}, {listing.state}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(listing.status)}`}>
+                        {listing.status.replaceAll("_", " ")}
+                      </span>
+                      <span className="text-sm font-medium text-slate-200">{formatCurrency(listing.dailyRate)}/day</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-3">
+                    <Link
+                      href={`/operator/listings/${listing.id}`}
+                      className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
+                    >
+                      Open workflow
+                    </Link>
+                    <Link
+                      href={`/customer/listings/${listing.id}`}
+                      className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500"
+                    >
+                      Open customer view
+                    </Link>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </section>
 
