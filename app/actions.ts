@@ -218,7 +218,7 @@ export async function reviewListing(formData: FormData) {
 }
 
 export async function updateBookingStatus(formData: FormData) {
-  await requireRole(["OPERATOR", "ADMIN"], "/operator");
+  const session = await requireRole(["OPERATOR", "ADMIN"], "/operator");
 
   const bookingId = getString(formData, "bookingId");
   const nextStatus = getString(formData, "nextStatus");
@@ -242,6 +242,26 @@ export async function updateBookingStatus(formData: FormData) {
   }
 
   try {
+    if (session.role === "OPERATOR") {
+      const authorizedBooking = await prisma.booking.findFirst({
+        where: {
+          id: bookingId,
+          listing: {
+            owner: {
+              email: session.email,
+            },
+          },
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!authorizedBooking) {
+        redirect(getRedirectUrl(returnTo, "booking-status-failed"));
+      }
+    }
+
     const booking = await prisma.booking.update({
       where: {
         id: bookingId,

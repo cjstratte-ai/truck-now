@@ -34,10 +34,10 @@ export default async function OperatorBookingDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ message?: string | string[] }>;
 }) {
-  await requireRole(["OPERATOR", "ADMIN"], "/operator");
+  const session = await requireRole(["OPERATOR", "ADMIN"], "/operator");
   const { id } = await params;
   const resolvedSearchParams = await searchParams;
-  const data = await getOperatorBookingDetail(id);
+  const data = await getOperatorBookingDetail(id, session.role === "OPERATOR" ? session.email : undefined);
 
   if (!data) {
     notFound();

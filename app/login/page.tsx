@@ -45,6 +45,7 @@ export default async function LoginPage({
             <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">Customer routes stay open for browsing and booking requests.</div>
             <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">Operator routes require the OPERATOR or ADMIN role.</div>
             <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">Admin routes require the ADMIN role.</div>
+            <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">For the demo data, use <span className="font-medium text-slate-100">operator@trucksnow.com</span> as the operator login and <span className="font-medium text-slate-100">admin@trucksnow.com</span> as the admin login.</div>
           </div>
 
           <div className="mt-8 flex flex-wrap gap-3">

@@ -20,9 +20,9 @@ function getStatusClasses(status: string) {
 }
 
 export default async function OperatorListingDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireRole(["OPERATOR", "ADMIN"], "/operator");
+  const session = await requireRole(["OPERATOR", "ADMIN"], "/operator");
   const { id } = await params;
-  const data = await getOperatorListingDetail(id);
+  const data = await getOperatorListingDetail(id, session.role === "OPERATOR" ? session.email : undefined);
 
   if (!data) {
     notFound();

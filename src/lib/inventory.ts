@@ -142,6 +142,7 @@ type ListingRecord = InventoryItem & {
 type BookingRecord = {
   id: string;
   listingId: string;
+  ownerEmail: string;
   listingTitle: string;
   city: string;
   customerName: string;
@@ -214,6 +215,7 @@ const fallbackBookings: BookingRecord[] = [
   {
     id: "booking-1",
     listingId: "listing-1",
+    ownerEmail: "operator@trucksnow.com",
     listingTitle: "2021 Ford F-250 Work Truck",
     city: "Dallas",
     customerName: "Demo Customer",
@@ -227,6 +229,7 @@ const fallbackBookings: BookingRecord[] = [
   {
     id: "booking-2",
     listingId: "listing-2",
+    ownerEmail: "operator@trucksnow.com",
     listingTitle: "2020 Isuzu NPR Box Truck",
     city: "Houston",
     customerName: "Northside Builders",
@@ -240,6 +243,7 @@ const fallbackBookings: BookingRecord[] = [
   {
     id: "booking-3",
     listingId: "listing-1",
+    ownerEmail: "operator@trucksnow.com",
     listingTitle: "2021 Ford F-250 Work Truck",
     city: "Dallas",
     customerName: "Riverfront Moving",
@@ -300,6 +304,24 @@ function mapOperatorBooking(booking: BookingRecord): OperatorBooking {
     status: booking.status,
     verificationStatus: booking.verificationStatus,
     totalAmount: booking.totalAmount,
+  };
+}
+
+function getScopedOperatorData(listings: ListingRecord[], bookings: BookingRecord[], ownerEmail?: string) {
+  if (!ownerEmail) {
+    return {
+      listings,
+      bookings,
+    };
+  }
+
+  const scopedListings = listings.filter((listing) => listing.ownerEmail === ownerEmail);
+  const listingIds = new Set(scopedListings.map((listing) => listing.id));
+  const scopedBookings = bookings.filter((booking) => listingIds.has(booking.listingId));
+
+  return {
+    listings: scopedListings,
+    bookings: scopedBookings,
   };
 }
 
@@ -467,6 +489,11 @@ async function loadCatalog(): Promise<CatalogData> {
             select: {
               title: true,
               city: true,
+              owner: {
+                select: {
+                  email: true,
+                },
+              },
             },
           },
           customer: {
@@ -505,6 +532,9 @@ async function loadCatalog(): Promise<CatalogData> {
       listing: {
         title: string;
         city: string;
+        owner: {
+          email: string;
+        };
       };
       customer: {
         name: string | null;
@@ -529,6 +559,7 @@ async function loadCatalog(): Promise<CatalogData> {
       bookings: typedBookings.map((booking) => ({
         id: booking.id,
         listingId: booking.listingId,
+        ownerEmail: booking.listing.owner.email,
         listingTitle: booking.listing.title,
         city: booking.listing.city,
         customerName: booking.customer.name ?? booking.customer.email,
@@ -611,10 +642,11 @@ export async function getCustomerListingDetail(id: string): Promise<CustomerList
   };
 }
 
-export async function getOperatorDashboardData(): Promise<OperatorDashboardData> {
+export async function getOperatorDashboardData(ownerEmail?: string): Promise<OperatorDashboardData> {
   const { source, listings, bookings } = await loadCatalog();
-  const operatorListings = listings.map(mapOperatorListing);
-  const operatorBookings = bookings.slice(0, 8).map(mapOperatorBooking);
+  const scoped = getScopedOperatorData(listings, bookings, ownerEmail);
+  const operatorListings = scoped.listings.map(mapOperatorListing);
+  const operatorBookings = scoped.bookings.slice(0, 8).map(mapOperatorBooking);
 
   return {
     sourceLabel: getSourceLabel(source, "operator dashboard"),
@@ -634,15 +666,16 @@ export async function getOperatorDashboardData(): Promise<OperatorDashboardData>
   };
 }
 
-export async function getOperatorListingDetail(id: string): Promise<OperatorListingDetail | null> {
+export async function getOperatorListingDetail(id: string, ownerEmail?: string): Promise<OperatorListingDetail | null> {
   const { source, listings, bookings } = await loadCatalog();
-  const listing = listings.find((item) => item.id === id);
+  const scoped = getScopedOperatorData(listings, bookings, ownerEmail);
+  const listing = scoped.listings.find((item) => item.id === id);
 
   if (!listing) {
     return null;
   }
 
-  const relatedBookings = bookings.filter((booking) => booking.listingId === listing.id);
+  const relatedBookings = scoped.bookings.filter((booking) => booking.listingId === listing.id);
 
   return {
     sourceLabel: getSourceLabel(source, "operator workflow"),
@@ -660,9 +693,9 @@ export async function getOperatorListingDetail(id: string): Promise<OperatorList
   };
 }
 
-export async function getOperatorBookingDetail(id: string): Promise<OperatorBookingDetail | null> {
+export async function getOperatorBookingDetail(id: string, ownerEmail?: string): Promise<OperatorBookingDetail | null> {
   const { source, bookings } = await loadCatalog();
-  const booking = bookings.find((item) => item.id === id);
+  const booking = bookings.find((item) => item.id === id && (!ownerEmail || item.ownerEmail === ownerEmail));
 
   if (!booking) {
     return null;

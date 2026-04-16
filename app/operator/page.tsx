@@ -31,8 +31,8 @@ function getStatusClasses(status: string) {
 }
 
 export default async function OperatorPage() {
-  await requireRole(["OPERATOR", "ADMIN"], "/operator");
-  const data = await getOperatorDashboardData();
+  const session = await requireRole(["OPERATOR", "ADMIN"], "/operator");
+  const data = await getOperatorDashboardData(session.role === "OPERATOR" ? session.email : undefined);
 
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-6 py-16 text-white">
