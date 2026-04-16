@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { updateBookingStatus } from "@/app/actions";
 import { getOperatorBookingDetail } from "@/src/lib/inventory";
+import { getFlashClasses, getWorkflowFlash } from "@/src/lib/workflow-flash";
 
 function formatCurrency(amount: number) {
   return `$${(amount / 100).toFixed(2)}`;
@@ -27,13 +29,23 @@ function getStatusClasses(status: string) {
   }
 }
 
-export default async function OperatorBookingDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function OperatorBookingDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ message?: string | string[] }>;
+}) {
   const { id } = await params;
+  const resolvedSearchParams = await searchParams;
   const data = await getOperatorBookingDetail(id);
 
   if (!data) {
     notFound();
   }
+
+  const flash = getWorkflowFlash(resolvedSearchParams.message);
+  const isDemoMode = data.sourceLabel.startsWith("Sample");
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-6 py-16 text-white">
@@ -64,7 +76,12 @@ export default async function OperatorBookingDetailPage({ params }: { params: Pr
             {formatDate(data.booking.startDate)} to {formatDate(data.booking.endDate)}
           </span>
         </div>
+        {isDemoMode ? (
+          <p className="mt-4 text-sm text-slate-400">Demo mode is active here, so booking updates validate and redirect but do not persist yet.</p>
+        ) : null}
       </div>
+
+      {flash ? <div className={`mt-6 rounded-2xl border px-4 py-3 text-sm ${getFlashClasses(flash.tone)}`}>{flash.text}</div> : null}
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_1fr]">
         <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
@@ -83,7 +100,7 @@ export default async function OperatorBookingDetailPage({ params }: { params: Pr
         </section>
 
         <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-          <h2 className="text-xl font-semibold">Recommended next steps</h2>
+          <h2 className="text-xl font-semibold">Workflow actions</h2>
           <div className="mt-4 space-y-3">
             {data.actionItems.map((item) => (
               <div key={item} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 text-sm text-slate-300">
@@ -93,12 +110,48 @@ export default async function OperatorBookingDetailPage({ params }: { params: Pr
           </div>
 
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link
-              href="/operator"
-              className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
-            >
-              Back to dashboard
-            </Link>
+            {data.booking.status === "REQUESTED" ? (
+              <>
+                <form action={updateBookingStatus}>
+                  <input type="hidden" name="bookingId" value={data.booking.id} />
+                  <input type="hidden" name="nextStatus" value="APPROVED" />
+                  <input type="hidden" name="returnTo" value={`/operator/bookings/${data.booking.id}`} />
+                  <button
+                    type="submit"
+                    className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-emerald-400"
+                  >
+                    Approve request
+                  </button>
+                </form>
+
+                <form action={updateBookingStatus}>
+                  <input type="hidden" name="bookingId" value={data.booking.id} />
+                  <input type="hidden" name="nextStatus" value="REJECTED" />
+                  <input type="hidden" name="returnTo" value={`/operator/bookings/${data.booking.id}`} />
+                  <button
+                    type="submit"
+                    className="rounded-lg bg-rose-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-rose-400"
+                  >
+                    Reject request
+                  </button>
+                </form>
+              </>
+            ) : null}
+
+            {data.booking.status === "APPROVED" ? (
+              <form action={updateBookingStatus}>
+                <input type="hidden" name="bookingId" value={data.booking.id} />
+                <input type="hidden" name="nextStatus" value="PAID" />
+                <input type="hidden" name="returnTo" value={`/operator/bookings/${data.booking.id}`} />
+                <button
+                  type="submit"
+                  className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
+                >
+                  Mark paid
+                </button>
+              </form>
+            ) : null}
+
             <Link
               href={`/operator/listings/${data.booking.listingId}`}
               className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500"
