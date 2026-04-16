@@ -6,7 +6,7 @@ export type FlashNotice = {
 const flashMessages: Record<string, FlashNotice> = {
   "booking-request-created": {
     tone: "success",
-    text: "Booking request sent. It is now waiting in the workflow for review.",
+    text: "Booking request sent. It is now waiting in the workflow for review, and the operator notification is queued.",
   },
   "booking-request-demo": {
     tone: "success",
@@ -19,6 +19,14 @@ const flashMessages: Record<string, FlashNotice> = {
   "booking-request-invalid-dates": {
     tone: "error",
     text: "Those rental dates do not look valid. Please check them and try again.",
+  },
+  "booking-request-past-date": {
+    tone: "error",
+    text: "Booking requests need a future start date.",
+  },
+  "booking-request-conflict": {
+    tone: "error",
+    text: "That truck already has a conflicting request or booking for those dates.",
   },
   "booking-request-unavailable": {
     tone: "error",
@@ -50,7 +58,7 @@ const flashMessages: Record<string, FlashNotice> = {
   },
   "booking-approved": {
     tone: "success",
-    text: "Booking approved.",
+    text: "Booking approved. Customer payment and next-step notifications are now ready.",
   },
   "booking-approved-demo": {
     tone: "success",
@@ -58,7 +66,7 @@ const flashMessages: Record<string, FlashNotice> = {
   },
   "booking-rejected": {
     tone: "success",
-    text: "Booking rejected.",
+    text: "Booking rejected and the customer-facing update is ready.",
   },
   "booking-rejected-demo": {
     tone: "success",
@@ -66,7 +74,7 @@ const flashMessages: Record<string, FlashNotice> = {
   },
   "booking-paid": {
     tone: "success",
-    text: "Booking marked paid.",
+    text: "Booking marked paid. The handoff notification is now ready.",
   },
   "booking-paid-demo": {
     tone: "success",
@@ -78,7 +86,7 @@ const flashMessages: Record<string, FlashNotice> = {
   },
   "verification-approved": {
     tone: "success",
-    text: "Verification approved.",
+    text: "Verification approved. The booking can keep moving cleanly through the workflow.",
   },
   "verification-approved-demo": {
     tone: "success",

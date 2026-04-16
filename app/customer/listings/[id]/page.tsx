@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { createBookingRequest } from "@/app/actions";
+import { BookingRequestForm } from "./booking-request-form";
+
+import { getCurrentSession } from "@/src/lib/auth";
 import { getCustomerListingDetail } from "@/src/lib/inventory";
 import { getFlashClasses, getWorkflowFlash } from "@/src/lib/workflow-flash";
 
@@ -18,7 +20,7 @@ export default async function CustomerListingDetailPage({
 }) {
   const { id } = await params;
   const resolvedSearchParams = await searchParams;
-  const data = await getCustomerListingDetail(id);
+  const [data, session] = await Promise.all([getCustomerListingDetail(id), getCurrentSession()]);
 
   if (!data) {
     notFound();
@@ -72,67 +74,12 @@ export default async function CustomerListingDetailPage({
 
         <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
           <h2 className="text-xl font-semibold">Request this truck</h2>
-          <form action={createBookingRequest} className="mt-4 space-y-4">
-            <input type="hidden" name="listingId" value={data.listing.id} />
-
-            <div>
-              <label htmlFor="customerName" className="text-sm text-slate-300">
-                Name
-              </label>
-              <input
-                id="customerName"
-                name="customerName"
-                className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-orange-400"
-                placeholder="Your name"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="customerEmail" className="text-sm text-slate-300">
-                Email
-              </label>
-              <input
-                id="customerEmail"
-                name="customerEmail"
-                type="email"
-                className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-orange-400"
-                placeholder="you@example.com"
-              />
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label htmlFor="startDate" className="text-sm text-slate-300">
-                  Start date
-                </label>
-                <input
-                  id="startDate"
-                  name="startDate"
-                  type="date"
-                  className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-orange-400"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="endDate" className="text-sm text-slate-300">
-                  End date
-                </label>
-                <input
-                  id="endDate"
-                  name="endDate"
-                  type="date"
-                  className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-orange-400"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full rounded-xl bg-orange-500 px-4 py-3 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
-            >
-              Send booking request
-            </button>
-          </form>
+          <BookingRequestForm
+            listingId={data.listing.id}
+            dailyRate={data.listing.dailyRate}
+            defaultName={session?.name}
+            defaultEmail={session?.email}
+          />
         </section>
       </div>
     </main>

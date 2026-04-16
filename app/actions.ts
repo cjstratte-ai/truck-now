@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { clearSession, createSession, normalizeNextPath, requireRole } from "@/src/lib/auth";
+import { getRentalDays } from "@/src/lib/booking-workflow";
 
 async function loadPrismaClient() {
   if (!process.env.DATABASE_URL) {
@@ -91,9 +92,15 @@ export async function createBookingRequest(formData: FormData) {
 
   const startDate = new Date(startDateValue);
   const endDate = new Date(endDateValue);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
   if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate <= startDate) {
     redirect(getRedirectUrl(returnTo, "booking-request-invalid-dates"));
+  }
+
+  if (startDate < today) {
+    redirect(getRedirectUrl(returnTo, "booking-request-past-date"));
   }
 
   const prisma = await loadPrismaClient();
@@ -118,6 +125,28 @@ export async function createBookingRequest(formData: FormData) {
       redirect(getRedirectUrl(returnTo, "booking-request-unavailable"));
     }
 
+    const conflict = await prisma.booking.findFirst({
+      where: {
+        listingId: listing.id,
+        status: {
+          in: ["REQUESTED", "APPROVED", "PAID"],
+        },
+        startDate: {
+          lt: endDate,
+        },
+        endDate: {
+          gt: startDate,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (conflict) {
+      redirect(getRedirectUrl(returnTo, "booking-request-conflict"));
+    }
+
     const customer = await prisma.user.upsert({
       where: {
         email: customerEmail,
@@ -132,8 +161,7 @@ export async function createBookingRequest(formData: FormData) {
       },
     });
 
-    const durationMs = endDate.getTime() - startDate.getTime();
-    const rentalDays = Math.max(1, Math.ceil(durationMs / (1000 * 60 * 60 * 24)));
+    const rentalDays = getRentalDays(startDateValue, endDateValue);
     const totalAmount = rentalDays * listing.dailyRate;
 
     const booking = await prisma.booking.create({
