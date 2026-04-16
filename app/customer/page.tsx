@@ -1,6 +1,14 @@
 import { getActiveListings } from "@/src/lib/inventory";
 
-const fallbackInventory = [
+type InventoryItem = {
+  id: string;
+  title: string;
+  city: string;
+  dailyRate: number;
+  description: string;
+};
+
+const fallbackInventory: InventoryItem[] = [
   {
     id: "fallback-1",
     title: "2021 Ford F-250 Work Truck",
@@ -26,7 +34,7 @@ const fallbackInventory = [
 
 export default async function CustomerPage() {
   const listings = await getActiveListings();
-  const inventory = listings.length > 0 ? listings : fallbackInventory;
+  const inventory: InventoryItem[] = listings.length > 0 ? listings : fallbackInventory;
   const sourceLabel = listings.length > 0 ? "Live DB inventory" : "Fallback sample inventory";
 
   return (

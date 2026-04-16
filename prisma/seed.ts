@@ -1,4 +1,4 @@
-import { PrismaClient, ListingStatus, Role } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -11,7 +11,7 @@ async function main() {
     data: {
       email: "operator@trucksnow.com",
       name: "Texas Fleet Rentals",
-      role: Role.OPERATOR,
+      role: "OPERATOR",
     },
   });
 
@@ -19,7 +19,7 @@ async function main() {
     data: {
       email: "customer@trucksnow.com",
       name: "Demo Customer",
-      role: Role.CUSTOMER,
+      role: "CUSTOMER",
     },
   });
 
@@ -27,7 +27,7 @@ async function main() {
     data: {
       email: "admin@trucksnow.com",
       name: "Platform Admin",
-      role: Role.ADMIN,
+      role: "ADMIN",
     },
   });
 
@@ -41,7 +41,7 @@ async function main() {
         city: "Dallas",
         state: "TX",
         dailyRate: 14900,
-        status: ListingStatus.ACTIVE,
+        status: "ACTIVE",
       },
       {
         ownerId: operator.id,
@@ -51,7 +51,7 @@ async function main() {
         city: "Houston",
         state: "TX",
         dailyRate: 17900,
-        status: ListingStatus.ACTIVE,
+        status: "ACTIVE",
       },
       {
         ownerId: operator.id,
@@ -61,7 +61,7 @@ async function main() {
         city: "Austin",
         state: "TX",
         dailyRate: 15900,
-        status: ListingStatus.ACTIVE,
+        status: "ACTIVE",
       },
     ],
   });

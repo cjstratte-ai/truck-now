@@ -1,24 +1,134 @@
-export default function OperatorPage() {
-  return (
-    <main className="mx-auto min-h-screen max-w-5xl px-6 py-16 text-white">
-      <h1 className="text-4xl font-bold">Operator portal</h1>
-      <p className="mt-3 max-w-2xl text-slate-300">
-        This is the owner and operator shell for managing listings, bookings, payouts, and paperwork.
-      </p>
+import { getOperatorDashboardData } from "@/src/lib/inventory";
 
-      <div className="mt-8 grid gap-4 md:grid-cols-3">
-        <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
-          <h2 className="text-xl font-semibold">Listings</h2>
-          <p className="mt-2 text-slate-400">Create and manage truck listings.</p>
+function formatCurrency(amount: number) {
+  return `$${(amount / 100).toFixed(2)}`;
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function getStatusClasses(status: string) {
+  switch (status) {
+    case "ACTIVE":
+    case "PAID":
+    case "APPROVED":
+      return "bg-emerald-500/15 text-emerald-300";
+    case "PENDING_APPROVAL":
+    case "REQUESTED":
+      return "bg-amber-500/15 text-amber-300";
+    case "DRAFT":
+      return "bg-slate-700 text-slate-300";
+    default:
+      return "bg-rose-500/15 text-rose-300";
+  }
+}
+
+export default async function OperatorPage() {
+  const data = await getOperatorDashboardData();
+
+  return (
+    <main className="mx-auto min-h-screen max-w-6xl px-6 py-16 text-white">
+      <div className="mb-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div>
+          <span className="rounded-full bg-orange-500/20 px-3 py-1 text-sm text-orange-300">
+            {data.sourceLabel}
+          </span>
+          <h1 className="mt-4 text-4xl font-bold">Operator portal</h1>
+          <p className="mt-3 max-w-2xl text-slate-300">
+            Manage live trucks, watch booking requests, and keep a quick pulse on revenue potential.
+          </p>
         </div>
-        <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
-          <h2 className="text-xl font-semibold">Bookings</h2>
-          <p className="mt-2 text-slate-400">Approve or reject booking requests.</p>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <div className="rounded-xl border border-slate-800 bg-slate-900 p-6 xl:col-span-1">
+          <p className="text-sm text-slate-400">Active listings</p>
+          <p className="mt-2 text-3xl font-semibold">{data.stats.activeListings}</p>
         </div>
-        <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
-          <h2 className="text-xl font-semibold">Payouts</h2>
-          <p className="mt-2 text-slate-400">Track Stripe Connect onboarding and payouts.</p>
+        <div className="rounded-xl border border-slate-800 bg-slate-900 p-6 xl:col-span-1">
+          <p className="text-sm text-slate-400">Draft + pending</p>
+          <p className="mt-2 text-3xl font-semibold">{data.stats.pendingListings}</p>
         </div>
+        <div className="rounded-xl border border-slate-800 bg-slate-900 p-6 xl:col-span-1">
+          <p className="text-sm text-slate-400">Requested bookings</p>
+          <p className="mt-2 text-3xl font-semibold">{data.stats.requestedBookings}</p>
+        </div>
+        <div className="rounded-xl border border-slate-800 bg-slate-900 p-6 xl:col-span-1">
+          <p className="text-sm text-slate-400">Paid bookings</p>
+          <p className="mt-2 text-3xl font-semibold">{data.stats.paidBookings}</p>
+        </div>
+        <div className="rounded-xl border border-slate-800 bg-slate-900 p-6 xl:col-span-1">
+          <p className="text-sm text-slate-400">Daily revenue potential</p>
+          <p className="mt-2 text-3xl font-semibold">{formatCurrency(data.stats.revenuePotential)}</p>
+        </div>
+      </div>
+
+      <div className="mt-8 grid gap-6 xl:grid-cols-[1.3fr_1fr]">
+        <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Listings</h2>
+            <span className="text-sm text-slate-400">{data.listings.length} total</span>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            {data.listings.map((listing) => (
+              <div
+                key={listing.id}
+                className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-950/60 p-4 md:flex-row md:items-center md:justify-between"
+              >
+                <div>
+                  <h3 className="font-semibold">{listing.title}</h3>
+                  <p className="mt-1 text-sm text-slate-400">
+                    {listing.city}, {listing.state}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(listing.status)}`}>
+                    {listing.status.replaceAll("_", " ")}
+                  </span>
+                  <span className="text-sm font-medium text-slate-200">{formatCurrency(listing.dailyRate)}/day</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Recent bookings</h2>
+            <span className="text-sm text-slate-400">{data.bookings.length} shown</span>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            {data.bookings.map((booking) => (
+              <div key={booking.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="font-semibold">{booking.listingTitle}</h3>
+                  <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(booking.status)}`}>
+                    {booking.status.replaceAll("_", " ")}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-slate-400">
+                  {booking.customerName} in {booking.city}
+                </p>
+                <p className="mt-1 text-sm text-slate-400">
+                  {formatDate(booking.startDate)} to {formatDate(booking.endDate)}
+                </p>
+                <div className="mt-3 flex items-center justify-between text-sm">
+                  <span className="text-slate-400">
+                    Verification: <span className="text-slate-200">{booking.verificationStatus.replaceAll("_", " ")}</span>
+                  </span>
+                  <span className="font-medium text-slate-200">{formatCurrency(booking.totalAmount)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
     </main>
   );
