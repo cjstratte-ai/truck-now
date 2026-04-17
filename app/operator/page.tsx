@@ -1,9 +1,14 @@
 import Link from "next/link";
 
+import { bulkUpdateOperatorBookings, bulkUpdateOperatorListings } from "@/app/actions";
+import { BulkSelectControls } from "@/src/components/bulk-select-controls";
 import { requireRole } from "@/src/lib/auth";
 import { getOperatorDashboardData } from "@/src/lib/inventory";
 
 type OperatorFilters = {
+  message?: string;
+  updated?: string;
+  skipped?: string;
   listingFilter?: string;
   bookingFilter?: string;
   listingSearch?: string;
@@ -78,6 +83,64 @@ function parseSelectedStatuses(value?: string | string[] | null) {
   const raw = Array.isArray(value) ? value : [value];
 
   return [...new Set(raw.flatMap((item) => item.split(",")).map((item) => item.trim()).filter(Boolean))];
+}
+
+function parseCount(value?: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getOperatorBulkMessageMeta(message?: string) {
+  switch (message) {
+    case "bulk-operator-listing-submitted":
+      return {
+        tone: "success" as const,
+        title: "Listings submitted",
+        detail: "Eligible draft or rejected listings were sent back to admin review.",
+      };
+    case "bulk-operator-listing-archived":
+      return {
+        tone: "success" as const,
+        title: "Listings archived",
+        detail: "Eligible active listings were archived.",
+      };
+    case "bulk-operator-listing-restored":
+      return {
+        tone: "success" as const,
+        title: "Listings restored",
+        detail: "Eligible archived listings were restored to draft.",
+      };
+    case "bulk-operator-booking-approved":
+      return {
+        tone: "success" as const,
+        title: "Bookings approved",
+        detail: "Eligible booking requests were moved into payment capture.",
+      };
+    case "bulk-operator-booking-rejected":
+      return {
+        tone: "success" as const,
+        title: "Bookings rejected",
+        detail: "Selected booking requests were rejected.",
+      };
+    case "bulk-operator-listing-failed":
+      return {
+        tone: "error" as const,
+        title: "Bulk listing action failed",
+        detail: "Nothing changed. Some selected listings may no longer be eligible.",
+      };
+    case "bulk-operator-booking-failed":
+      return {
+        tone: "error" as const,
+        title: "Bulk booking action failed",
+        detail: "Nothing changed. Some selected bookings may no longer be eligible.",
+      };
+    default:
+      return null;
+  }
 }
 
 function getAgeMeta(value?: string | null, staleAfterDays = 3) {
@@ -196,7 +259,11 @@ export default async function OperatorPage({
   const bookingAge = filters.bookingAge ?? "all";
   const bookingWindow = filters.bookingWindow ?? "all";
   const bookingPayment = filters.bookingPayment ?? "all";
+  const bulkMessage = getOperatorBulkMessageMeta(filters.message);
+  const updatedCount = parseCount(filters.updated);
+  const skippedCount = parseCount(filters.skipped);
   const todayKey = getLocalDayKey(new Date().toISOString());
+  const currentOperatorHref = buildOperatorHref(filters, {});
   const listingStatuses = new Set(parseSelectedStatuses(filters.listingStatuses));
   const bookingStatuses = new Set(parseSelectedStatuses(filters.bookingStatuses));
 
@@ -470,6 +537,26 @@ export default async function OperatorPage({
         ))}
       </div>
 
+      {bulkMessage ? (
+        <div
+          className={`mb-8 rounded-2xl border px-4 py-4 text-sm ${
+            bulkMessage.tone === "success"
+              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-100"
+              : "border-rose-500/30 bg-rose-500/10 text-rose-100"
+          }`}
+        >
+          <p className="font-medium">{bulkMessage.title}</p>
+          <p className="mt-1 text-sm/6 opacity-90">{bulkMessage.detail}</p>
+          {bulkMessage.tone === "success" && (updatedCount !== null || skippedCount !== null) ? (
+            <p className="mt-2 text-xs uppercase tracking-wide opacity-80">
+              {updatedCount !== null ? `Updated ${updatedCount}` : null}
+              {updatedCount !== null && skippedCount !== null ? " • " : null}
+              {skippedCount !== null ? `Skipped ${skippedCount}` : null}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <div className="rounded-xl border border-slate-800 bg-slate-900 p-6 xl:col-span-1">
           <p className="text-sm text-slate-400">Active listings</p>
@@ -600,7 +687,45 @@ export default async function OperatorPage({
             </form>
           </div>
 
-          <div className="mt-4 space-y-3">
+          <form action={bulkUpdateOperatorListings} className="mt-4 space-y-3">
+            <input type="hidden" name="returnTo" value={currentOperatorHref} />
+            {sortedListings.length > 0 ? (
+              <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-slate-100">Bulk listing actions</p>
+                    <p className="text-xs text-slate-400">Submit drafts, archive active inventory, or restore archived listings in one pass.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <BulkSelectControls targetName="listingIds" />
+                    <button
+                      type="submit"
+                      name="nextStatus"
+                      value="PENDING_APPROVAL"
+                      className="rounded-full bg-orange-500 px-3 py-1.5 text-xs font-medium text-slate-950 transition hover:bg-orange-400"
+                    >
+                      Submit selected
+                    </button>
+                    <button
+                      type="submit"
+                      name="nextStatus"
+                      value="ARCHIVED"
+                      className="rounded-full border border-slate-500 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-slate-300"
+                    >
+                      Archive selected
+                    </button>
+                    <button
+                      type="submit"
+                      name="nextStatus"
+                      value="DRAFT"
+                      className="rounded-full border border-slate-500 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-slate-300"
+                    >
+                      Restore selected
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             {sortedListings.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/40 p-6 text-sm text-slate-300">
                 No listings match this view yet.
@@ -610,49 +735,57 @@ export default async function OperatorPage({
                 const ageMeta = getAgeMeta(listing.createdAt, listing.status === "ACTIVE" ? 14 : 5);
 
                 return (
-                  <div key={listing.id} className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="font-semibold">{listing.title}</h3>
-                          {ageMeta ? (
-                            <span className={`rounded-full px-3 py-1 text-[11px] font-medium ${ageMeta.className}`}>
-                              {ageMeta.label}
-                            </span>
-                          ) : null}
+                  <div key={listing.id} className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      name="listingIds"
+                      value={listing.id}
+                      className="mt-4 h-4 w-4 rounded border-slate-600 bg-slate-950 text-orange-500 focus:ring-orange-400"
+                    />
+                    <div className="flex flex-1 flex-col gap-4 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="font-semibold">{listing.title}</h3>
+                            {ageMeta ? (
+                              <span className={`rounded-full px-3 py-1 text-[11px] font-medium ${ageMeta.className}`}>
+                                {ageMeta.label}
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="mt-1 text-sm text-slate-400">
+                            {listing.city}, {listing.state}
+                          </p>
                         </div>
-                        <p className="mt-1 text-sm text-slate-400">
-                          {listing.city}, {listing.state}
-                        </p>
+
+                        <div className="flex items-center gap-3">
+                          <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(listing.status)}`}>
+                            {listing.status.replaceAll("_", " ")}
+                          </span>
+                          <span className="text-sm font-medium text-slate-200">{formatCurrency(listing.dailyRate)}/day</span>
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-3">
-                        <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(listing.status)}`}>
-                          {listing.status.replaceAll("_", " ")}
-                        </span>
-                        <span className="text-sm font-medium text-slate-200">{formatCurrency(listing.dailyRate)}/day</span>
+                      <div className="flex flex-wrap gap-3">
+                        <Link
+                          href={`/operator/listings/${listing.id}`}
+                          className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
+                        >
+                          Open workflow
+                        </Link>
+                        <Link
+                          href={`/customer/listings/${listing.id}`}
+                          className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500"
+                        >
+                          Open customer view
+                        </Link>
                       </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-3">
-                      <Link
-                        href={`/operator/listings/${listing.id}`}
-                        className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
-                      >
-                        Open workflow
-                      </Link>
-                      <Link
-                        href={`/customer/listings/${listing.id}`}
-                        className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500"
-                      >
-                        Open customer view
-                      </Link>
                     </div>
                   </div>
                 );
               })
             )}
-          </div>
+          </form>
         </section>
 
         <section id="operator-bookings" className="rounded-2xl border border-slate-800 bg-slate-900 p-6 scroll-mt-24">
@@ -762,7 +895,43 @@ export default async function OperatorPage({
             </form>
           </div>
 
-          <div className="mt-4 space-y-3">
+          <form action={bulkUpdateOperatorBookings} className="mt-4 space-y-3">
+            <input type="hidden" name="returnTo" value={currentOperatorHref} />
+            {sortedBookings.length > 0 ? (
+              <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-slate-100">Bulk booking actions</p>
+                    <p className="text-xs text-slate-400">Approve or reject selected booking requests in one pass.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <BulkSelectControls targetName="bookingIds" />
+                    <button
+                      type="submit"
+                      name="nextStatus"
+                      value="APPROVED"
+                      className="rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-medium text-slate-950 transition hover:bg-emerald-400"
+                    >
+                      Approve selected
+                    </button>
+                    <button
+                      type="submit"
+                      name="nextStatus"
+                      value="REJECTED"
+                      className="rounded-full border border-rose-400 px-3 py-1.5 text-xs font-medium text-rose-200 transition hover:bg-rose-500/10"
+                    >
+                      Reject selected
+                    </button>
+                  </div>
+                </div>
+                <textarea
+                  name="statusNote"
+                  rows={2}
+                  placeholder="Optional shared booking note"
+                  className="mt-3 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-orange-400"
+                />
+              </div>
+            ) : null}
             {sortedBookings.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/40 p-6 text-sm text-slate-300">
                 No bookings match this view right now.
@@ -772,57 +941,65 @@ export default async function OperatorPage({
                 const ageMeta = getAgeMeta(booking.createdAt, booking.status === "APPROVED" ? 2 : 3);
 
                 return (
-                  <div key={booking.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="font-semibold">{booking.listingTitle}</h3>
-                        {ageMeta ? (
-                          <span className={`rounded-full px-3 py-1 text-[11px] font-medium ${ageMeta.className}`}>
-                            {ageMeta.label}
-                          </span>
-                        ) : null}
-                      </div>
-                      <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(booking.status)}`}>
-                        {booking.status.replaceAll("_", " ")}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-sm text-slate-400">
-                      {booking.customerName} in {booking.city}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-400">
-                      {formatDate(booking.startDate)} to {formatDate(booking.endDate)}
-                    </p>
-                    <div className="mt-3 flex items-center justify-between text-sm">
-                      <span className="text-slate-400">
-                        Verification: <span className="text-slate-200">{booking.verificationStatus.replaceAll("_", " ")}</span>
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span className="rounded-full bg-slate-700 px-3 py-1 text-[11px] font-medium text-slate-200">
-                          {booking.paymentStatus.replaceAll("_", " ")}
+                  <div key={booking.id} className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      name="bookingIds"
+                      value={booking.id}
+                      className="mt-4 h-4 w-4 rounded border-slate-600 bg-slate-950 text-orange-500 focus:ring-orange-400"
+                    />
+                    <div className="flex-1 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-semibold">{booking.listingTitle}</h3>
+                          {ageMeta ? (
+                            <span className={`rounded-full px-3 py-1 text-[11px] font-medium ${ageMeta.className}`}>
+                              {ageMeta.label}
+                            </span>
+                          ) : null}
+                        </div>
+                        <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(booking.status)}`}>
+                          {booking.status.replaceAll("_", " ")}
                         </span>
-                        <span className="font-medium text-slate-200">{formatCurrency(booking.totalAmount)}</span>
                       </div>
-                    </div>
+                      <p className="mt-2 text-sm text-slate-400">
+                        {booking.customerName} in {booking.city}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-400">
+                        {formatDate(booking.startDate)} to {formatDate(booking.endDate)}
+                      </p>
+                      <div className="mt-3 flex items-center justify-between text-sm">
+                        <span className="text-slate-400">
+                          Verification: <span className="text-slate-200">{booking.verificationStatus.replaceAll("_", " ")}</span>
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-full bg-slate-700 px-3 py-1 text-[11px] font-medium text-slate-200">
+                            {booking.paymentStatus.replaceAll("_", " ")}
+                          </span>
+                          <span className="font-medium text-slate-200">{formatCurrency(booking.totalAmount)}</span>
+                        </div>
+                      </div>
 
-                    <div className="mt-4 flex flex-wrap gap-3">
-                      <Link
-                        href={`/operator/bookings/${booking.id}`}
-                        className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
-                      >
-                        Review booking
-                      </Link>
-                      <Link
-                        href={`/operator/listings/${booking.listingId}`}
-                        className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500"
-                      >
-                        Open listing
-                      </Link>
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        <Link
+                          href={`/operator/bookings/${booking.id}`}
+                          className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
+                        >
+                          Review booking
+                        </Link>
+                        <Link
+                          href={`/operator/listings/${booking.listingId}`}
+                          className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500"
+                        >
+                          Open listing
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 );
               })
             )}
-          </div>
+          </form>
         </section>
       </div>
     </main>

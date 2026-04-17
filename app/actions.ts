@@ -744,6 +744,102 @@ export async function archiveOperatorListing(formData: FormData) {
   }
 }
 
+export async function bulkUpdateOperatorListings(formData: FormData) {
+  const session = await requireRole(["OPERATOR", "ADMIN"], "/operator");
+
+  const listingIds = getStringList(formData, "listingIds");
+  const nextStatus = getString(formData, "nextStatus") as "PENDING_APPROVAL" | "ARCHIVED" | "DRAFT";
+  const returnTo = getString(formData, "returnTo") || "/operator";
+
+  if (listingIds.length === 0 || !["PENDING_APPROVAL", "ARCHIVED", "DRAFT"].includes(nextStatus)) {
+    redirect(getRedirectUrl(returnTo, "bulk-operator-listing-failed"));
+  }
+
+  const prisma = await loadPrismaClient();
+
+  if (!prisma) {
+    redirect(
+      getRedirectUrl(
+        returnTo,
+        nextStatus === "PENDING_APPROVAL"
+          ? "bulk-operator-listing-submitted-demo"
+          : nextStatus === "ARCHIVED"
+            ? "bulk-operator-listing-archived-demo"
+            : "bulk-operator-listing-restored-demo",
+      ),
+    );
+  }
+
+  try {
+    const listings = await prisma.listing.findMany({
+      where: {
+        id: {
+          in: listingIds,
+        },
+        ...(session.role === "OPERATOR"
+          ? {
+              owner: {
+                email: session.email,
+              },
+            }
+          : {}),
+      },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+
+    const eligibleListings = listings.filter((listing) => {
+      if (nextStatus === "PENDING_APPROVAL") {
+        return listing.status === "DRAFT" || listing.status === "REJECTED";
+      }
+
+      if (nextStatus === "ARCHIVED") {
+        return listing.status === "ACTIVE";
+      }
+
+      return listing.status === "ARCHIVED";
+    });
+
+    if (eligibleListings.length === 0) {
+      redirect(getRedirectUrl(returnTo, "bulk-operator-listing-failed"));
+    }
+
+    await prisma.listing.updateMany({
+      where: {
+        id: {
+          in: eligibleListings.map((listing) => listing.id),
+        },
+      },
+      data: {
+        status: nextStatus,
+      },
+    });
+
+    for (const listing of eligibleListings) {
+      revalidateWorkflowPaths(listing.id);
+    }
+
+    redirect(
+      getRedirectUrlWithParams(
+        returnTo,
+        nextStatus === "PENDING_APPROVAL"
+          ? "bulk-operator-listing-submitted"
+          : nextStatus === "ARCHIVED"
+            ? "bulk-operator-listing-archived"
+            : "bulk-operator-listing-restored",
+        {
+          updated: eligibleListings.length,
+          skipped: Math.max(0, listingIds.length - eligibleListings.length),
+        },
+      ),
+    );
+  } catch {
+    redirect(getRedirectUrl(returnTo, "bulk-operator-listing-failed"));
+  }
+}
+
 export async function updateBookingStatus(formData: FormData) {
   const session = await requireRole(["OPERATOR", "ADMIN"], "/operator");
 
@@ -879,6 +975,131 @@ export async function updateBookingStatus(formData: FormData) {
     redirect(getRedirectUrl(returnTo, successMessage));
   } catch {
     redirect(getRedirectUrl(returnTo, "booking-status-failed"));
+  }
+}
+
+export async function bulkUpdateOperatorBookings(formData: FormData) {
+  const session = await requireRole(["OPERATOR", "ADMIN"], "/operator");
+
+  const bookingIds = getStringList(formData, "bookingIds");
+  const nextStatus = getString(formData, "nextStatus") as "APPROVED" | "REJECTED";
+  const statusNote = getString(formData, "statusNote");
+  const returnTo = getString(formData, "returnTo") || "/operator";
+
+  if (bookingIds.length === 0 || !["APPROVED", "REJECTED"].includes(nextStatus)) {
+    redirect(getRedirectUrl(returnTo, "bulk-operator-booking-failed"));
+  }
+
+  const prisma = await loadPrismaClient();
+
+  if (!prisma) {
+    redirect(getRedirectUrl(returnTo, nextStatus === "APPROVED" ? "bulk-operator-booking-approved-demo" : "bulk-operator-booking-rejected-demo"));
+  }
+
+  try {
+    const currentBookings = await prisma.booking.findMany({
+      where: {
+        id: {
+          in: bookingIds,
+        },
+        ...(session.role === "OPERATOR"
+          ? {
+              listing: {
+                owner: {
+                  email: session.email,
+                },
+              },
+            }
+          : {}),
+      },
+      select: {
+        id: true,
+        listingId: true,
+        status: true,
+        verificationStatus: true,
+        paymentStatus: true,
+      },
+    });
+
+    const eligibleBookings = currentBookings.filter((booking) => {
+      if (nextStatus === "APPROVED") {
+        return booking.status === "REQUESTED" && booking.verificationStatus !== "REJECTED";
+      }
+
+      return booking.status !== "PAID";
+    });
+
+    if (eligibleBookings.length === 0) {
+      redirect(getRedirectUrl(returnTo, "bulk-operator-booking-failed"));
+    }
+
+    const now = new Date();
+
+    for (const currentBooking of eligibleBookings) {
+      const updateData =
+        nextStatus === "APPROVED"
+          ? {
+              status: nextStatus,
+              paymentStatus: "PENDING_CAPTURE" as const,
+              paymentCapturedAt: null,
+              paymentReference: null,
+              ...getNotificationFlowForBookingStatus(nextStatus),
+            }
+          : {
+              status: nextStatus,
+              paymentStatus: "NOT_READY" as const,
+              paymentCapturedAt: null,
+              paymentReference: null,
+              ...getNotificationFlowForBookingStatus(nextStatus),
+            };
+
+      const booking = await prisma.booking.update({
+        where: {
+          id: currentBooking.id,
+        },
+        data: updateData,
+        select: {
+          id: true,
+          listingId: true,
+        },
+      });
+
+      await logBookingTimelineEvents(prisma, booking.id, [
+        {
+          eventType: nextStatus === "APPROVED" ? "BOOKING_APPROVED" : "BOOKING_REJECTED",
+          title: nextStatus === "APPROVED" ? "Booking approved" : "Booking rejected",
+          detail:
+            nextStatus === "APPROVED"
+              ? `${session.name} bulk approved the booking and moved it into payment capture.${statusNote ? ` Note: ${statusNote}` : ""}`
+              : `${session.name} bulk rejected the booking and stopped it from moving forward.${statusNote ? ` Note: ${statusNote}` : ""}`,
+          actorRole: session.role,
+          actorName: session.name,
+          occurredAt: now,
+        },
+        {
+          eventType: "WORKFLOW_NOTIFICATION_QUEUED",
+          title: "Workflow updates queued",
+          detail:
+            nextStatus === "APPROVED"
+              ? "Customer payment instructions and ops follow-up are pending send."
+              : "Customer and ops rejection updates are pending send.",
+          actorRole: "SYSTEM",
+          actorName: "Workflow automation",
+          occurredAt: now,
+        },
+      ]);
+
+      revalidateWorkflowPaths(booking.listingId, booking.id);
+    }
+
+    redirect(
+      getRedirectUrlWithParams(returnTo, nextStatus === "APPROVED" ? "bulk-operator-booking-approved" : "bulk-operator-booking-rejected", {
+        updated: eligibleBookings.length,
+        skipped: Math.max(0, bookingIds.length - eligibleBookings.length),
+      }),
+    );
+  } catch {
+    redirect(getRedirectUrl(returnTo, "bulk-operator-booking-failed"));
   }
 }
 
