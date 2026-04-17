@@ -3,6 +3,20 @@ import Link from "next/link";
 import { requireRole } from "@/src/lib/auth";
 import { getAdminDashboardData } from "@/src/lib/inventory";
 
+type AdminFilters = {
+  listingFilter?: string;
+  bookingFilter?: string;
+  verificationFilter?: string;
+  listingSearch?: string;
+  bookingSearch?: string;
+  verificationSearch?: string;
+  listingSort?: string;
+  bookingSort?: string;
+  verificationSort?: string;
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 function formatCurrency(amount: number) {
   return `$${(amount / 100).toFixed(2)}`;
 }
@@ -25,49 +39,92 @@ function itemLabel(count: number) {
   return `${count} ${count === 1 ? "item" : "items"}`;
 }
 
-function buildFilterHref(
-  current: {
-    listingFilter?: string;
-    bookingFilter?: string;
-    verificationFilter?: string;
-    listingSearch?: string;
-    bookingSearch?: string;
-    verificationSearch?: string;
-  },
-  key: "listingFilter" | "bookingFilter" | "verificationFilter",
-  value: string,
-) {
+function getTimestamp(value?: string | null) {
+  return value ? new Date(value).getTime() : 0;
+}
+
+function getAgeMeta(value?: string | null, staleAfterDays = 3) {
+  if (!value) {
+    return null;
+  }
+
+  const diffMs = Date.now() - new Date(value).getTime();
+
+  if (Number.isNaN(diffMs) || diffMs < 0) {
+    return null;
+  }
+
+  const diffDays = Math.floor(diffMs / DAY_MS);
+  const label = diffDays === 0 ? "new today" : diffDays === 1 ? "1d old" : `${diffDays}d old`;
+
+  if (diffDays >= staleAfterDays) {
+    return {
+      label: `stale · ${label}`,
+      className: "bg-rose-500/15 text-rose-300",
+    };
+  }
+
+  if (diffDays >= Math.max(1, staleAfterDays - 1)) {
+    return {
+      label,
+      className: "bg-amber-500/15 text-amber-300",
+    };
+  }
+
+  return {
+    label,
+    className: "bg-slate-700 text-slate-300",
+  };
+}
+
+function buildAdminHref(current: AdminFilters, updates: Partial<Record<keyof AdminFilters, string | null>>) {
+  const next = { ...current, ...updates };
   const params = new URLSearchParams();
 
-  const nextListingFilter = key === "listingFilter" ? value : current.listingFilter;
-  const nextBookingFilter = key === "bookingFilter" ? value : current.bookingFilter;
-  const nextVerificationFilter = key === "verificationFilter" ? value : current.verificationFilter;
-  const nextListingSearch = current.listingSearch?.trim();
-  const nextBookingSearch = current.bookingSearch?.trim();
-  const nextVerificationSearch = current.verificationSearch?.trim();
+  const listingFilter = next.listingFilter ?? "all";
+  const bookingFilter = next.bookingFilter ?? "requested";
+  const verificationFilter = next.verificationFilter ?? "pending";
+  const listingSort = next.listingSort ?? "age";
+  const bookingSort = next.bookingSort ?? "age";
+  const verificationSort = next.verificationSort ?? "age";
+  const listingSearch = next.listingSearch?.trim() ?? "";
+  const bookingSearch = next.bookingSearch?.trim() ?? "";
+  const verificationSearch = next.verificationSearch?.trim() ?? "";
 
-  if (nextListingFilter && nextListingFilter !== "all") {
-    params.set("listingFilter", nextListingFilter);
+  if (listingFilter !== "all") {
+    params.set("listingFilter", listingFilter);
   }
 
-  if (nextBookingFilter && nextBookingFilter !== "all") {
-    params.set("bookingFilter", nextBookingFilter);
+  if (bookingFilter !== "requested") {
+    params.set("bookingFilter", bookingFilter);
   }
 
-  if (nextVerificationFilter && nextVerificationFilter !== "all") {
-    params.set("verificationFilter", nextVerificationFilter);
+  if (verificationFilter !== "pending") {
+    params.set("verificationFilter", verificationFilter);
   }
 
-  if (nextListingSearch) {
-    params.set("listingSearch", nextListingSearch);
+  if (listingSearch) {
+    params.set("listingSearch", listingSearch);
   }
 
-  if (nextBookingSearch) {
-    params.set("bookingSearch", nextBookingSearch);
+  if (bookingSearch) {
+    params.set("bookingSearch", bookingSearch);
   }
 
-  if (nextVerificationSearch) {
-    params.set("verificationSearch", nextVerificationSearch);
+  if (verificationSearch) {
+    params.set("verificationSearch", verificationSearch);
+  }
+
+  if (listingSort !== "age") {
+    params.set("listingSort", listingSort);
+  }
+
+  if (bookingSort !== "age") {
+    params.set("bookingSort", bookingSort);
+  }
+
+  if (verificationSort !== "age") {
+    params.set("verificationSort", verificationSort);
   }
 
   const query = params.toString();
@@ -77,14 +134,7 @@ function buildFilterHref(
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{
-    listingFilter?: string;
-    bookingFilter?: string;
-    verificationFilter?: string;
-    listingSearch?: string;
-    bookingSearch?: string;
-    verificationSearch?: string;
-  }>;
+  searchParams: Promise<AdminFilters>;
 }) {
   await requireRole(["ADMIN"], "/admin");
   const filters = await searchParams;
@@ -96,11 +146,16 @@ export default async function AdminPage({
   const listingSearch = filters.listingSearch?.trim().toLowerCase() ?? "";
   const bookingSearch = filters.bookingSearch?.trim().toLowerCase() ?? "";
   const verificationSearch = filters.verificationSearch?.trim().toLowerCase() ?? "";
+  const listingSort = filters.listingSort ?? "age";
+  const bookingSort = filters.bookingSort ?? "age";
+  const verificationSort = filters.verificationSort ?? "age";
 
   const filteredListings = data.listings.filter((listing) => {
     const matchesSearch =
       listingSearch.length === 0 ||
-      [listing.title, listing.city, listing.state, listing.status].some((value) => value.toLowerCase().includes(listingSearch));
+      [listing.title, listing.city, listing.state, listing.status, listing.vehicleType].some((value) =>
+        value.toLowerCase().includes(listingSearch),
+      );
 
     if (!matchesSearch) {
       return false;
@@ -115,6 +170,19 @@ export default async function AdminPage({
         return listing.status === "ACTIVE";
       default:
         return true;
+    }
+  });
+
+  const sortedListings = [...filteredListings].sort((a, b) => {
+    switch (listingSort) {
+      case "newest":
+        return getTimestamp(b.createdAt) - getTimestamp(a.createdAt);
+      case "title":
+        return a.title.localeCompare(b.title);
+      case "status":
+        return a.status.localeCompare(b.status) || a.title.localeCompare(b.title);
+      default:
+        return getTimestamp(a.createdAt) - getTimestamp(b.createdAt);
     }
   });
 
@@ -143,6 +211,19 @@ export default async function AdminPage({
     }
   });
 
+  const sortedBookings = [...filteredBookings].sort((a, b) => {
+    switch (bookingSort) {
+      case "newest":
+        return getTimestamp(b.createdAt) - getTimestamp(a.createdAt);
+      case "amount-high":
+        return b.totalAmount - a.totalAmount;
+      case "status":
+        return a.status.localeCompare(b.status) || b.totalAmount - a.totalAmount;
+      default:
+        return getTimestamp(a.createdAt) - getTimestamp(b.createdAt);
+    }
+  });
+
   const filteredVerificationQueue = data.bookings.filter((booking) => {
     const matchesSearch =
       verificationSearch.length === 0 ||
@@ -163,6 +244,19 @@ export default async function AdminPage({
         return booking.verificationStatus === "REJECTED";
       default:
         return true;
+    }
+  });
+
+  const sortedVerificationQueue = [...filteredVerificationQueue].sort((a, b) => {
+    switch (verificationSort) {
+      case "newest":
+        return getTimestamp(b.createdAt) - getTimestamp(a.createdAt);
+      case "amount-high":
+        return b.totalAmount - a.totalAmount;
+      case "customer":
+        return a.customerName.localeCompare(b.customerName);
+      default:
+        return getTimestamp(a.createdAt) - getTimestamp(b.createdAt);
     }
   });
 
@@ -204,6 +298,72 @@ export default async function AdminPage({
     },
   ];
 
+  const listingSortOptions = [
+    { key: "age", label: "Oldest first" },
+    { key: "newest", label: "Newest" },
+    { key: "title", label: "Title" },
+    { key: "status", label: "Status" },
+  ];
+
+  const bookingSortOptions = [
+    { key: "age", label: "Oldest first" },
+    { key: "newest", label: "Newest" },
+    { key: "amount-high", label: "Highest amount" },
+    { key: "status", label: "Status" },
+  ];
+
+  const verificationSortOptions = [
+    { key: "age", label: "Oldest first" },
+    { key: "newest", label: "Newest" },
+    { key: "amount-high", label: "Highest amount" },
+    { key: "customer", label: "Customer" },
+  ];
+
+  const presets = [
+    {
+      label: "Needs review",
+      href: buildAdminHref(filters, {
+        listingFilter: "pending",
+        bookingFilter: "requested",
+        verificationFilter: "pending",
+        listingSearch: "",
+        bookingSearch: "",
+        verificationSearch: "",
+        listingSort: "age",
+        bookingSort: "age",
+        verificationSort: "age",
+      }),
+    },
+    {
+      label: "Rejected cleanup",
+      href: buildAdminHref(filters, {
+        listingFilter: "rejected",
+        bookingFilter: "rejected",
+        verificationFilter: "rejected",
+        listingSearch: "",
+        bookingSearch: "",
+        verificationSearch: "",
+        listingSort: "age",
+        bookingSort: "age",
+        verificationSort: "age",
+      }),
+    },
+    {
+      label: "Money in flight",
+      href: buildAdminHref(filters, {
+        listingFilter: "active",
+        bookingFilter: "approved",
+        verificationFilter: "approved",
+        listingSearch: "",
+        bookingSearch: "",
+        verificationSearch: "",
+        listingSort: "newest",
+        bookingSort: "amount-high",
+        verificationSort: "amount-high",
+      }),
+    },
+  ];
+
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-6 py-16 text-white">
       <div className="mb-10">
@@ -215,7 +375,7 @@ export default async function AdminPage({
         </p>
       </div>
 
-      <div className="mb-8 flex flex-wrap gap-3 text-sm">
+      <div className="mb-6 flex flex-wrap gap-3 text-sm">
         <a href="#admin-listing-review" className="rounded-full border border-slate-700 px-3 py-1.5 text-slate-200 transition hover:border-slate-500">
           Listing review
         </a>
@@ -225,6 +385,22 @@ export default async function AdminPage({
         <a href="#admin-verification-queue" className="rounded-full border border-slate-700 px-3 py-1.5 text-slate-200 transition hover:border-slate-500">
           Verification queue
         </a>
+      </div>
+
+      <div className="mb-8 flex flex-wrap gap-3 text-sm">
+        <span className="self-center text-slate-400">Queue presets</span>
+        <Link href="/admin" className="rounded-full border border-slate-700 px-3 py-1.5 text-slate-200 transition hover:border-slate-500">
+          Reset
+        </Link>
+        {presets.map((preset) => (
+          <Link
+            key={preset.label}
+            href={preset.href}
+            className="rounded-full border border-slate-700 px-3 py-1.5 text-slate-200 transition hover:border-orange-400 hover:text-orange-200"
+          >
+            {preset.label}
+          </Link>
+        ))}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -251,83 +427,106 @@ export default async function AdminPage({
           <div className="flex flex-col gap-4">
             <div>
               <h2 className="text-xl font-semibold">Listing review</h2>
-              <span className="text-sm text-slate-400">{itemLabel(filteredListings.length)}</span>
+              <span className="text-sm text-slate-400">{itemLabel(sortedListings.length)}</span>
             </div>
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap gap-2">
-                {listingFilters.map((filter) => {
-                  const isActive = listingFilter === filter.key;
-                  return (
-                    <Link
-                      key={filter.key}
-                      href={buildFilterHref(filters, "listingFilter", filter.key)}
-                      className={`rounded-full border px-3 py-1.5 text-xs transition ${
-                        isActive
-                          ? "border-orange-400 bg-orange-500/15 text-orange-200"
-                          : "border-slate-700 text-slate-300 hover:border-slate-500"
-                      }`}
-                    >
-                      {filter.label} · {filter.count}
-                    </Link>
-                  );
-                })}
-              </div>
 
-              <form method="get" className="flex flex-wrap items-center gap-2">
-                {listingFilter !== "all" ? <input type="hidden" name="listingFilter" value={listingFilter} /> : null}
-                {bookingFilter !== "all" ? <input type="hidden" name="bookingFilter" value={bookingFilter} /> : null}
-                {verificationFilter !== "all" ? (
-                  <input type="hidden" name="verificationFilter" value={verificationFilter} />
-                ) : null}
-                {bookingSearch ? <input type="hidden" name="bookingSearch" value={bookingSearch} /> : null}
-                {verificationSearch ? (
-                  <input type="hidden" name="verificationSearch" value={verificationSearch} />
-                ) : null}
-                <input
-                  type="search"
-                  name="listingSearch"
-                  defaultValue={filters.listingSearch ?? ""}
-                  placeholder="Search listings"
-                  className="w-full min-w-[220px] rounded-full border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm text-slate-100 outline-none transition focus:border-orange-400"
-                />
-                <button
-                  type="submit"
-                  className="rounded-full border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500"
-                >
-                  Apply
-                </button>
-              </form>
+            <div className="flex flex-wrap gap-2">
+              {listingFilters.map((filter) => {
+                const isActive = listingFilter === filter.key;
+                return (
+                  <Link
+                    key={filter.key}
+                    href={buildAdminHref(filters, { listingFilter: filter.key })}
+                    className={`rounded-full border px-3 py-1.5 text-xs transition ${
+                      isActive
+                        ? "border-orange-400 bg-orange-500/15 text-orange-200"
+                        : "border-slate-700 text-slate-300 hover:border-slate-500"
+                    }`}
+                  >
+                    {filter.label} · {filter.count}
+                  </Link>
+                );
+              })}
             </div>
+
+            <form method="get" className="flex flex-wrap items-center gap-2">
+              {listingFilter !== "all" ? <input type="hidden" name="listingFilter" value={listingFilter} /> : null}
+              {bookingFilter !== "requested" ? <input type="hidden" name="bookingFilter" value={bookingFilter} /> : null}
+              {verificationFilter !== "pending" ? (
+                <input type="hidden" name="verificationFilter" value={verificationFilter} />
+              ) : null}
+              {bookingSearch ? <input type="hidden" name="bookingSearch" value={filters.bookingSearch ?? ""} /> : null}
+              {verificationSearch ? (
+                <input type="hidden" name="verificationSearch" value={filters.verificationSearch ?? ""} />
+              ) : null}
+              {bookingSort !== "age" ? <input type="hidden" name="bookingSort" value={bookingSort} /> : null}
+              {verificationSort !== "age" ? <input type="hidden" name="verificationSort" value={verificationSort} /> : null}
+              <input
+                type="search"
+                name="listingSearch"
+                defaultValue={filters.listingSearch ?? ""}
+                placeholder="Search listings"
+                className="w-full min-w-[220px] rounded-full border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm text-slate-100 outline-none transition focus:border-orange-400"
+              />
+              <select
+                name="listingSort"
+                defaultValue={listingSort}
+                className="rounded-full border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm text-slate-100 outline-none transition focus:border-orange-400"
+              >
+                {listingSortOptions.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    Sort: {option.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="submit"
+                className="rounded-full border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500"
+              >
+                Apply
+              </button>
+            </form>
           </div>
 
           <div className="mt-4 space-y-3">
-            {filteredListings.length === 0 ? (
+            {sortedListings.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/40 p-6 text-sm text-slate-300">
-                No listings match this filter right now.
+                No listings match this view right now.
               </div>
             ) : (
-              filteredListings.map((listing) => (
-                <div key={listing.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="font-semibold">{listing.title}</h3>
-                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(listing.status)}`}>
-                      {listing.status.replaceAll("_", " ")}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-sm text-slate-400">
-                    {listing.city}, {listing.state}
-                  </p>
+              sortedListings.map((listing) => {
+                const ageMeta = getAgeMeta(listing.createdAt, listing.status === "ACTIVE" ? 10 : 4);
 
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    <Link
-                      href={`/admin/listings/${listing.id}`}
-                      className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
-                    >
-                      Open review
-                    </Link>
+                return (
+                  <div key={listing.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-semibold">{listing.title}</h3>
+                        {ageMeta ? (
+                          <span className={`rounded-full px-3 py-1 text-[11px] font-medium ${ageMeta.className}`}>
+                            {ageMeta.label}
+                          </span>
+                        ) : null}
+                      </div>
+                      <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(listing.status)}`}>
+                        {listing.status.replaceAll("_", " ")}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm text-slate-400">
+                      {listing.city}, {listing.state}
+                    </p>
+
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <Link
+                        href={`/admin/listings/${listing.id}`}
+                        className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
+                      >
+                        Open review
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </section>
@@ -336,82 +535,105 @@ export default async function AdminPage({
           <div className="flex flex-col gap-4">
             <div>
               <h2 className="text-xl font-semibold">Booking review</h2>
-              <span className="text-sm text-slate-400">{itemLabel(filteredBookings.length)}</span>
+              <span className="text-sm text-slate-400">{itemLabel(sortedBookings.length)}</span>
             </div>
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap gap-2">
-                {bookingFilters.map((filter) => {
-                  const isActive = bookingFilter === filter.key;
-                  return (
-                    <Link
-                      key={filter.key}
-                      href={buildFilterHref(filters, "bookingFilter", filter.key)}
-                      className={`rounded-full border px-3 py-1.5 text-xs transition ${
-                        isActive
-                          ? "border-orange-400 bg-orange-500/15 text-orange-200"
-                          : "border-slate-700 text-slate-300 hover:border-slate-500"
-                      }`}
-                    >
-                      {filter.label} · {filter.count}
-                    </Link>
-                  );
-                })}
-              </div>
 
-              <form method="get" className="flex flex-wrap items-center gap-2">
-                {listingFilter !== "all" ? <input type="hidden" name="listingFilter" value={listingFilter} /> : null}
-                {verificationFilter !== "all" ? (
-                  <input type="hidden" name="verificationFilter" value={verificationFilter} />
-                ) : null}
-                {listingSearch ? <input type="hidden" name="listingSearch" value={listingSearch} /> : null}
-                {verificationSearch ? (
-                  <input type="hidden" name="verificationSearch" value={verificationSearch} />
-                ) : null}
-                {bookingFilter !== "all" ? <input type="hidden" name="bookingFilter" value={bookingFilter} /> : null}
-                <input
-                  type="search"
-                  name="bookingSearch"
-                  defaultValue={filters.bookingSearch ?? ""}
-                  placeholder="Search bookings"
-                  className="w-full min-w-[220px] rounded-full border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm text-slate-100 outline-none transition focus:border-orange-400"
-                />
-                <button
-                  type="submit"
-                  className="rounded-full border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500"
-                >
-                  Apply
-                </button>
-              </form>
+            <div className="flex flex-wrap gap-2">
+              {bookingFilters.map((filter) => {
+                const isActive = bookingFilter === filter.key;
+                return (
+                  <Link
+                    key={filter.key}
+                    href={buildAdminHref(filters, { bookingFilter: filter.key })}
+                    className={`rounded-full border px-3 py-1.5 text-xs transition ${
+                      isActive
+                        ? "border-orange-400 bg-orange-500/15 text-orange-200"
+                        : "border-slate-700 text-slate-300 hover:border-slate-500"
+                    }`}
+                  >
+                    {filter.label} · {filter.count}
+                  </Link>
+                );
+              })}
             </div>
+
+            <form method="get" className="flex flex-wrap items-center gap-2">
+              {listingFilter !== "all" ? <input type="hidden" name="listingFilter" value={listingFilter} /> : null}
+              {verificationFilter !== "pending" ? (
+                <input type="hidden" name="verificationFilter" value={verificationFilter} />
+              ) : null}
+              {listingSearch ? <input type="hidden" name="listingSearch" value={filters.listingSearch ?? ""} /> : null}
+              {verificationSearch ? (
+                <input type="hidden" name="verificationSearch" value={filters.verificationSearch ?? ""} />
+              ) : null}
+              {listingSort !== "age" ? <input type="hidden" name="listingSort" value={listingSort} /> : null}
+              {verificationSort !== "age" ? <input type="hidden" name="verificationSort" value={verificationSort} /> : null}
+              {bookingFilter !== "requested" ? <input type="hidden" name="bookingFilter" value={bookingFilter} /> : null}
+              <input
+                type="search"
+                name="bookingSearch"
+                defaultValue={filters.bookingSearch ?? ""}
+                placeholder="Search bookings"
+                className="w-full min-w-[220px] rounded-full border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm text-slate-100 outline-none transition focus:border-orange-400"
+              />
+              <select
+                name="bookingSort"
+                defaultValue={bookingSort}
+                className="rounded-full border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm text-slate-100 outline-none transition focus:border-orange-400"
+              >
+                {bookingSortOptions.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    Sort: {option.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="submit"
+                className="rounded-full border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500"
+              >
+                Apply
+              </button>
+            </form>
           </div>
 
           <div className="mt-4 space-y-3">
-            {filteredBookings.length === 0 ? (
+            {sortedBookings.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/40 p-6 text-sm text-slate-300">
-                No bookings match this filter right now.
+                No bookings match this view right now.
               </div>
             ) : (
-              filteredBookings.map((booking) => (
-                <div key={booking.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="font-semibold">{booking.listingTitle}</h3>
-                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(booking.status)}`}>
-                      {booking.status.replaceAll("_", " ")}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-sm text-slate-400">{booking.customerName}</p>
-                  <p className="mt-3 text-sm font-medium text-slate-200">{formatCurrency(booking.totalAmount)}</p>
+              sortedBookings.map((booking) => {
+                const ageMeta = getAgeMeta(booking.createdAt, booking.status === "APPROVED" ? 2 : 3);
 
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    <Link
-                      href={`/admin/bookings/${booking.id}`}
-                      className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
-                    >
-                      Review request
-                    </Link>
+                return (
+                  <div key={booking.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-semibold">{booking.listingTitle}</h3>
+                        {ageMeta ? (
+                          <span className={`rounded-full px-3 py-1 text-[11px] font-medium ${ageMeta.className}`}>
+                            {ageMeta.label}
+                          </span>
+                        ) : null}
+                      </div>
+                      <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(booking.status)}`}>
+                        {booking.status.replaceAll("_", " ")}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm text-slate-400">{booking.customerName}</p>
+                    <p className="mt-3 text-sm font-medium text-slate-200">{formatCurrency(booking.totalAmount)}</p>
+
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <Link
+                        href={`/admin/bookings/${booking.id}`}
+                        className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
+                      >
+                        Review request
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </section>
@@ -420,82 +642,105 @@ export default async function AdminPage({
           <div className="flex flex-col gap-4">
             <div>
               <h2 className="text-xl font-semibold">Verification queue</h2>
-              <span className="text-sm text-slate-400">{itemLabel(filteredVerificationQueue.length)}</span>
+              <span className="text-sm text-slate-400">{itemLabel(sortedVerificationQueue.length)}</span>
             </div>
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap gap-2">
-                {verificationFilters.map((filter) => {
-                  const isActive = verificationFilter === filter.key;
-                  return (
-                    <Link
-                      key={filter.key}
-                      href={buildFilterHref(filters, "verificationFilter", filter.key)}
-                      className={`rounded-full border px-3 py-1.5 text-xs transition ${
-                        isActive
-                          ? "border-orange-400 bg-orange-500/15 text-orange-200"
-                          : "border-slate-700 text-slate-300 hover:border-slate-500"
-                      }`}
-                    >
-                      {filter.label} · {filter.count}
-                    </Link>
-                  );
-                })}
-              </div>
 
-              <form method="get" className="flex flex-wrap items-center gap-2">
-                {listingFilter !== "all" ? <input type="hidden" name="listingFilter" value={listingFilter} /> : null}
-                {bookingFilter !== "all" ? <input type="hidden" name="bookingFilter" value={bookingFilter} /> : null}
-                {listingSearch ? <input type="hidden" name="listingSearch" value={listingSearch} /> : null}
-                {bookingSearch ? <input type="hidden" name="bookingSearch" value={bookingSearch} /> : null}
-                {verificationFilter !== "all" ? (
-                  <input type="hidden" name="verificationFilter" value={verificationFilter} />
-                ) : null}
-                <input
-                  type="search"
-                  name="verificationSearch"
-                  defaultValue={filters.verificationSearch ?? ""}
-                  placeholder="Search verification"
-                  className="w-full min-w-[220px] rounded-full border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm text-slate-100 outline-none transition focus:border-orange-400"
-                />
-                <button
-                  type="submit"
-                  className="rounded-full border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500"
-                >
-                  Apply
-                </button>
-              </form>
+            <div className="flex flex-wrap gap-2">
+              {verificationFilters.map((filter) => {
+                const isActive = verificationFilter === filter.key;
+                return (
+                  <Link
+                    key={filter.key}
+                    href={buildAdminHref(filters, { verificationFilter: filter.key })}
+                    className={`rounded-full border px-3 py-1.5 text-xs transition ${
+                      isActive
+                        ? "border-orange-400 bg-orange-500/15 text-orange-200"
+                        : "border-slate-700 text-slate-300 hover:border-slate-500"
+                    }`}
+                  >
+                    {filter.label} · {filter.count}
+                  </Link>
+                );
+              })}
             </div>
+
+            <form method="get" className="flex flex-wrap items-center gap-2">
+              {listingFilter !== "all" ? <input type="hidden" name="listingFilter" value={listingFilter} /> : null}
+              {bookingFilter !== "requested" ? <input type="hidden" name="bookingFilter" value={bookingFilter} /> : null}
+              {listingSearch ? <input type="hidden" name="listingSearch" value={filters.listingSearch ?? ""} /> : null}
+              {bookingSearch ? <input type="hidden" name="bookingSearch" value={filters.bookingSearch ?? ""} /> : null}
+              {listingSort !== "age" ? <input type="hidden" name="listingSort" value={listingSort} /> : null}
+              {bookingSort !== "age" ? <input type="hidden" name="bookingSort" value={bookingSort} /> : null}
+              {verificationFilter !== "pending" ? (
+                <input type="hidden" name="verificationFilter" value={verificationFilter} />
+              ) : null}
+              <input
+                type="search"
+                name="verificationSearch"
+                defaultValue={filters.verificationSearch ?? ""}
+                placeholder="Search verification"
+                className="w-full min-w-[220px] rounded-full border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm text-slate-100 outline-none transition focus:border-orange-400"
+              />
+              <select
+                name="verificationSort"
+                defaultValue={verificationSort}
+                className="rounded-full border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm text-slate-100 outline-none transition focus:border-orange-400"
+              >
+                {verificationSortOptions.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    Sort: {option.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="submit"
+                className="rounded-full border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500"
+              >
+                Apply
+              </button>
+            </form>
           </div>
 
           <div className="mt-4 space-y-3">
-            {filteredVerificationQueue.length === 0 ? (
+            {sortedVerificationQueue.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/40 p-6 text-sm text-slate-300">
-                No verification items match this filter right now.
+                No verification items match this view right now.
               </div>
             ) : (
-              filteredVerificationQueue.map((booking) => (
-                <div key={booking.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="font-semibold">{booking.customerName}</h3>
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(booking.verificationStatus)}`}
-                    >
-                      {booking.verificationStatus.replaceAll("_", " ")}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-sm text-slate-400">{booking.listingTitle}</p>
-                  <p className="mt-3 text-sm font-medium text-slate-200">{formatCurrency(booking.totalAmount)}</p>
+              sortedVerificationQueue.map((booking) => {
+                const ageMeta = getAgeMeta(booking.createdAt, booking.verificationStatus === "APPROVED" ? 2 : 3);
 
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    <Link
-                      href={`/admin/bookings/${booking.id}`}
-                      className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
-                    >
-                      Check verification
-                    </Link>
+                return (
+                  <div key={booking.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-semibold">{booking.customerName}</h3>
+                        {ageMeta ? (
+                          <span className={`rounded-full px-3 py-1 text-[11px] font-medium ${ageMeta.className}`}>
+                            {ageMeta.label}
+                          </span>
+                        ) : null}
+                      </div>
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(booking.verificationStatus)}`}
+                      >
+                        {booking.verificationStatus.replaceAll("_", " ")}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm text-slate-400">{booking.listingTitle}</p>
+                    <p className="mt-3 text-sm font-medium text-slate-200">{formatCurrency(booking.totalAmount)}</p>
+
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <Link
+                        href={`/admin/bookings/${booking.id}`}
+                        className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
+                      >
+                        Check verification
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </section>

@@ -66,6 +66,7 @@ export type OperatorListing = {
   id: string;
   slug: string;
   title: string;
+  createdAt?: string | null;
   vehicleType: string;
   boxSizeFeet: number | null;
   passengerCapacity: number | null;
@@ -82,6 +83,7 @@ export type OperatorBooking = {
   listingTitle: string;
   city: string;
   customerName: string;
+  createdAt?: string | null;
   startDate: string;
   endDate: string;
   status: string;
@@ -144,6 +146,7 @@ export type AdminListingReview = {
   city: string;
   state: string;
   status: string;
+  createdAt?: string | null;
 };
 
 export type AdminBookingReview = {
@@ -151,6 +154,7 @@ export type AdminBookingReview = {
   listingId: string;
   listingTitle: string;
   customerName: string;
+  createdAt?: string | null;
   status: string;
   verificationStatus: string;
   totalAmount: number;
@@ -212,6 +216,7 @@ type ListingRecord = InventoryItem & {
   ownerName: string;
   ownerEmail: string;
   reviewNotes: string | null;
+  createdAt?: string | null;
 };
 
 type BookingRecord = {
@@ -222,6 +227,7 @@ type BookingRecord = {
   city: string;
   customerName: string;
   customerEmail: string;
+  createdAt?: string | null;
   startDate: string;
   endDate: string;
   totalAmount: number;
@@ -514,6 +520,7 @@ function mapOperatorListing(listing: ListingRecord): OperatorListing {
     id: listing.id,
     slug: listing.slug,
     title: listing.title,
+    createdAt: listing.createdAt,
     vehicleType: listing.vehicleType,
     boxSizeFeet: listing.boxSizeFeet,
     passengerCapacity: listing.passengerCapacity,
@@ -532,6 +539,7 @@ function mapOperatorBooking(booking: BookingRecord): OperatorBooking {
     listingTitle: booking.listingTitle,
     city: booking.city,
     customerName: booking.customerName,
+    createdAt: booking.createdAt,
     startDate: booking.startDate,
     endDate: booking.endDate,
     status: booking.status,
@@ -575,6 +583,7 @@ function mapAdminListingReview(listing: ListingRecord): AdminListingReview {
     city: listing.city,
     state: listing.state,
     status: listing.status,
+    createdAt: listing.createdAt,
   };
 }
 
@@ -584,6 +593,7 @@ function mapAdminBookingReview(booking: BookingRecord): AdminBookingReview {
     listingId: booking.listingId,
     listingTitle: booking.listingTitle,
     customerName: booking.customerName,
+    createdAt: booking.createdAt,
     status: booking.status,
     verificationStatus: booking.verificationStatus,
     totalAmount: booking.totalAmount,
@@ -748,6 +758,7 @@ async function loadCatalog(): Promise<CatalogData> {
         },
         select: {
           id: true,
+          createdAt: true,
           slug: true,
           title: true,
           vehicleType: true,
@@ -775,6 +786,7 @@ async function loadCatalog(): Promise<CatalogData> {
         },
         select: {
           id: true,
+          createdAt: true,
           listingId: true,
           startDate: true,
           endDate: true,
@@ -827,6 +839,7 @@ async function loadCatalog(): Promise<CatalogData> {
 
     const typedListings = listings as Array<{
       id: string;
+      createdAt: Date;
       slug: string;
       title: string;
       vehicleType: string;
@@ -848,6 +861,7 @@ async function loadCatalog(): Promise<CatalogData> {
 
     const typedBookings = bookings as Array<{
       id: string;
+      createdAt: Date;
       listingId: string;
       startDate: Date;
       endDate: Date;
@@ -889,6 +903,7 @@ async function loadCatalog(): Promise<CatalogData> {
       source: "live",
       listings: typedListings.map((listing) => ({
         id: listing.id,
+        createdAt: listing.createdAt.toISOString(),
         slug: listing.slug,
         title: listing.title,
         vehicleType: listing.vehicleType,
@@ -913,6 +928,7 @@ async function loadCatalog(): Promise<CatalogData> {
         city: booking.listing.city,
         customerName: booking.customer.name ?? booking.customer.email,
         customerEmail: booking.customer.email,
+        createdAt: booking.createdAt.toISOString(),
         startDate: booking.startDate.toISOString(),
         endDate: booking.endDate.toISOString(),
         totalAmount: booking.totalAmount,
