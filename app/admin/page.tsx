@@ -26,7 +26,14 @@ function itemLabel(count: number) {
 }
 
 function buildFilterHref(
-  current: { listingFilter?: string; bookingFilter?: string; verificationFilter?: string },
+  current: {
+    listingFilter?: string;
+    bookingFilter?: string;
+    verificationFilter?: string;
+    listingSearch?: string;
+    bookingSearch?: string;
+    verificationSearch?: string;
+  },
   key: "listingFilter" | "bookingFilter" | "verificationFilter",
   value: string,
 ) {
@@ -35,6 +42,9 @@ function buildFilterHref(
   const nextListingFilter = key === "listingFilter" ? value : current.listingFilter;
   const nextBookingFilter = key === "bookingFilter" ? value : current.bookingFilter;
   const nextVerificationFilter = key === "verificationFilter" ? value : current.verificationFilter;
+  const nextListingSearch = current.listingSearch?.trim();
+  const nextBookingSearch = current.bookingSearch?.trim();
+  const nextVerificationSearch = current.verificationSearch?.trim();
 
   if (nextListingFilter && nextListingFilter !== "all") {
     params.set("listingFilter", nextListingFilter);
@@ -48,6 +58,18 @@ function buildFilterHref(
     params.set("verificationFilter", nextVerificationFilter);
   }
 
+  if (nextListingSearch) {
+    params.set("listingSearch", nextListingSearch);
+  }
+
+  if (nextBookingSearch) {
+    params.set("bookingSearch", nextBookingSearch);
+  }
+
+  if (nextVerificationSearch) {
+    params.set("verificationSearch", nextVerificationSearch);
+  }
+
   const query = params.toString();
   return query ? `/admin?${query}` : "/admin";
 }
@@ -55,7 +77,14 @@ function buildFilterHref(
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ listingFilter?: string; bookingFilter?: string; verificationFilter?: string }>;
+  searchParams: Promise<{
+    listingFilter?: string;
+    bookingFilter?: string;
+    verificationFilter?: string;
+    listingSearch?: string;
+    bookingSearch?: string;
+    verificationSearch?: string;
+  }>;
 }) {
   await requireRole(["ADMIN"], "/admin");
   const filters = await searchParams;
@@ -64,8 +93,19 @@ export default async function AdminPage({
   const listingFilter = filters.listingFilter ?? "all";
   const bookingFilter = filters.bookingFilter ?? "requested";
   const verificationFilter = filters.verificationFilter ?? "pending";
+  const listingSearch = filters.listingSearch?.trim().toLowerCase() ?? "";
+  const bookingSearch = filters.bookingSearch?.trim().toLowerCase() ?? "";
+  const verificationSearch = filters.verificationSearch?.trim().toLowerCase() ?? "";
 
   const filteredListings = data.listings.filter((listing) => {
+    const matchesSearch =
+      listingSearch.length === 0 ||
+      [listing.title, listing.city, listing.state, listing.status].some((value) => value.toLowerCase().includes(listingSearch));
+
+    if (!matchesSearch) {
+      return false;
+    }
+
     switch (listingFilter) {
       case "pending":
         return listing.status === "PENDING_APPROVAL";
@@ -79,6 +119,16 @@ export default async function AdminPage({
   });
 
   const filteredBookings = data.bookings.filter((booking) => {
+    const matchesSearch =
+      bookingSearch.length === 0 ||
+      [booking.listingTitle, booking.customerName, booking.status, booking.verificationStatus].some((value) =>
+        value.toLowerCase().includes(bookingSearch),
+      );
+
+    if (!matchesSearch) {
+      return false;
+    }
+
     switch (bookingFilter) {
       case "requested":
         return booking.status === "REQUESTED";
@@ -94,6 +144,16 @@ export default async function AdminPage({
   });
 
   const filteredVerificationQueue = data.bookings.filter((booking) => {
+    const matchesSearch =
+      verificationSearch.length === 0 ||
+      [booking.listingTitle, booking.customerName, booking.status, booking.verificationStatus].some((value) =>
+        value.toLowerCase().includes(verificationSearch),
+      );
+
+    if (!matchesSearch) {
+      return false;
+    }
+
     switch (verificationFilter) {
       case "pending":
         return booking.verificationStatus === "PENDING";
@@ -188,28 +248,55 @@ export default async function AdminPage({
 
       <div className="mt-8 grid gap-6 xl:grid-cols-3">
         <section id="admin-listing-review" className="rounded-2xl border border-slate-800 bg-slate-900 p-6 scroll-mt-24">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-4">
             <div>
               <h2 className="text-xl font-semibold">Listing review</h2>
               <span className="text-sm text-slate-400">{itemLabel(filteredListings.length)}</span>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {listingFilters.map((filter) => {
-                const isActive = listingFilter === filter.key;
-                return (
-                  <Link
-                    key={filter.key}
-                    href={buildFilterHref(filters, "listingFilter", filter.key)}
-                    className={`rounded-full border px-3 py-1.5 text-xs transition ${
-                      isActive
-                        ? "border-orange-400 bg-orange-500/15 text-orange-200"
-                        : "border-slate-700 text-slate-300 hover:border-slate-500"
-                    }`}
-                  >
-                    {filter.label} · {filter.count}
-                  </Link>
-                );
-              })}
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap gap-2">
+                {listingFilters.map((filter) => {
+                  const isActive = listingFilter === filter.key;
+                  return (
+                    <Link
+                      key={filter.key}
+                      href={buildFilterHref(filters, "listingFilter", filter.key)}
+                      className={`rounded-full border px-3 py-1.5 text-xs transition ${
+                        isActive
+                          ? "border-orange-400 bg-orange-500/15 text-orange-200"
+                          : "border-slate-700 text-slate-300 hover:border-slate-500"
+                      }`}
+                    >
+                      {filter.label} · {filter.count}
+                    </Link>
+                  );
+                })}
+              </div>
+
+              <form method="get" className="flex flex-wrap items-center gap-2">
+                {listingFilter !== "all" ? <input type="hidden" name="listingFilter" value={listingFilter} /> : null}
+                {bookingFilter !== "all" ? <input type="hidden" name="bookingFilter" value={bookingFilter} /> : null}
+                {verificationFilter !== "all" ? (
+                  <input type="hidden" name="verificationFilter" value={verificationFilter} />
+                ) : null}
+                {bookingSearch ? <input type="hidden" name="bookingSearch" value={bookingSearch} /> : null}
+                {verificationSearch ? (
+                  <input type="hidden" name="verificationSearch" value={verificationSearch} />
+                ) : null}
+                <input
+                  type="search"
+                  name="listingSearch"
+                  defaultValue={filters.listingSearch ?? ""}
+                  placeholder="Search listings"
+                  className="w-full min-w-[220px] rounded-full border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm text-slate-100 outline-none transition focus:border-orange-400"
+                />
+                <button
+                  type="submit"
+                  className="rounded-full border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500"
+                >
+                  Apply
+                </button>
+              </form>
             </div>
           </div>
 
@@ -246,28 +333,55 @@ export default async function AdminPage({
         </section>
 
         <section id="admin-booking-review" className="rounded-2xl border border-slate-800 bg-slate-900 p-6 scroll-mt-24">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-4">
             <div>
               <h2 className="text-xl font-semibold">Booking review</h2>
               <span className="text-sm text-slate-400">{itemLabel(filteredBookings.length)}</span>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {bookingFilters.map((filter) => {
-                const isActive = bookingFilter === filter.key;
-                return (
-                  <Link
-                    key={filter.key}
-                    href={buildFilterHref(filters, "bookingFilter", filter.key)}
-                    className={`rounded-full border px-3 py-1.5 text-xs transition ${
-                      isActive
-                        ? "border-orange-400 bg-orange-500/15 text-orange-200"
-                        : "border-slate-700 text-slate-300 hover:border-slate-500"
-                    }`}
-                  >
-                    {filter.label} · {filter.count}
-                  </Link>
-                );
-              })}
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap gap-2">
+                {bookingFilters.map((filter) => {
+                  const isActive = bookingFilter === filter.key;
+                  return (
+                    <Link
+                      key={filter.key}
+                      href={buildFilterHref(filters, "bookingFilter", filter.key)}
+                      className={`rounded-full border px-3 py-1.5 text-xs transition ${
+                        isActive
+                          ? "border-orange-400 bg-orange-500/15 text-orange-200"
+                          : "border-slate-700 text-slate-300 hover:border-slate-500"
+                      }`}
+                    >
+                      {filter.label} · {filter.count}
+                    </Link>
+                  );
+                })}
+              </div>
+
+              <form method="get" className="flex flex-wrap items-center gap-2">
+                {listingFilter !== "all" ? <input type="hidden" name="listingFilter" value={listingFilter} /> : null}
+                {verificationFilter !== "all" ? (
+                  <input type="hidden" name="verificationFilter" value={verificationFilter} />
+                ) : null}
+                {listingSearch ? <input type="hidden" name="listingSearch" value={listingSearch} /> : null}
+                {verificationSearch ? (
+                  <input type="hidden" name="verificationSearch" value={verificationSearch} />
+                ) : null}
+                {bookingFilter !== "all" ? <input type="hidden" name="bookingFilter" value={bookingFilter} /> : null}
+                <input
+                  type="search"
+                  name="bookingSearch"
+                  defaultValue={filters.bookingSearch ?? ""}
+                  placeholder="Search bookings"
+                  className="w-full min-w-[220px] rounded-full border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm text-slate-100 outline-none transition focus:border-orange-400"
+                />
+                <button
+                  type="submit"
+                  className="rounded-full border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500"
+                >
+                  Apply
+                </button>
+              </form>
             </div>
           </div>
 
@@ -303,28 +417,53 @@ export default async function AdminPage({
         </section>
 
         <section id="admin-verification-queue" className="rounded-2xl border border-slate-800 bg-slate-900 p-6 scroll-mt-24">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-4">
             <div>
               <h2 className="text-xl font-semibold">Verification queue</h2>
               <span className="text-sm text-slate-400">{itemLabel(filteredVerificationQueue.length)}</span>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {verificationFilters.map((filter) => {
-                const isActive = verificationFilter === filter.key;
-                return (
-                  <Link
-                    key={filter.key}
-                    href={buildFilterHref(filters, "verificationFilter", filter.key)}
-                    className={`rounded-full border px-3 py-1.5 text-xs transition ${
-                      isActive
-                        ? "border-orange-400 bg-orange-500/15 text-orange-200"
-                        : "border-slate-700 text-slate-300 hover:border-slate-500"
-                    }`}
-                  >
-                    {filter.label} · {filter.count}
-                  </Link>
-                );
-              })}
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap gap-2">
+                {verificationFilters.map((filter) => {
+                  const isActive = verificationFilter === filter.key;
+                  return (
+                    <Link
+                      key={filter.key}
+                      href={buildFilterHref(filters, "verificationFilter", filter.key)}
+                      className={`rounded-full border px-3 py-1.5 text-xs transition ${
+                        isActive
+                          ? "border-orange-400 bg-orange-500/15 text-orange-200"
+                          : "border-slate-700 text-slate-300 hover:border-slate-500"
+                      }`}
+                    >
+                      {filter.label} · {filter.count}
+                    </Link>
+                  );
+                })}
+              </div>
+
+              <form method="get" className="flex flex-wrap items-center gap-2">
+                {listingFilter !== "all" ? <input type="hidden" name="listingFilter" value={listingFilter} /> : null}
+                {bookingFilter !== "all" ? <input type="hidden" name="bookingFilter" value={bookingFilter} /> : null}
+                {listingSearch ? <input type="hidden" name="listingSearch" value={listingSearch} /> : null}
+                {bookingSearch ? <input type="hidden" name="bookingSearch" value={bookingSearch} /> : null}
+                {verificationFilter !== "all" ? (
+                  <input type="hidden" name="verificationFilter" value={verificationFilter} />
+                ) : null}
+                <input
+                  type="search"
+                  name="verificationSearch"
+                  defaultValue={filters.verificationSearch ?? ""}
+                  placeholder="Search verification"
+                  className="w-full min-w-[220px] rounded-full border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm text-slate-100 outline-none transition focus:border-orange-400"
+                />
+                <button
+                  type="submit"
+                  className="rounded-full border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500"
+                >
+                  Apply
+                </button>
+              </form>
             </div>
           </div>
 

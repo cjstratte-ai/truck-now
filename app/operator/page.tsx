@@ -32,7 +32,7 @@ function getStatusClasses(status: string) {
 }
 
 function buildFilterHref(
-  current: { listingFilter?: string; bookingFilter?: string },
+  current: { listingFilter?: string; bookingFilter?: string; listingSearch?: string; bookingSearch?: string },
   key: "listingFilter" | "bookingFilter",
   value: string,
 ) {
@@ -40,6 +40,8 @@ function buildFilterHref(
 
   const nextListingFilter = key === "listingFilter" ? value : current.listingFilter;
   const nextBookingFilter = key === "bookingFilter" ? value : current.bookingFilter;
+  const nextListingSearch = current.listingSearch?.trim();
+  const nextBookingSearch = current.bookingSearch?.trim();
 
   if (nextListingFilter && nextListingFilter !== "all") {
     params.set("listingFilter", nextListingFilter);
@@ -49,6 +51,14 @@ function buildFilterHref(
     params.set("bookingFilter", nextBookingFilter);
   }
 
+  if (nextListingSearch) {
+    params.set("listingSearch", nextListingSearch);
+  }
+
+  if (nextBookingSearch) {
+    params.set("bookingSearch", nextBookingSearch);
+  }
+
   const query = params.toString();
   return query ? `/operator?${query}` : "/operator";
 }
@@ -56,7 +66,7 @@ function buildFilterHref(
 export default async function OperatorPage({
   searchParams,
 }: {
-  searchParams: Promise<{ listingFilter?: string; bookingFilter?: string }>;
+  searchParams: Promise<{ listingFilter?: string; bookingFilter?: string; listingSearch?: string; bookingSearch?: string }>;
 }) {
   const session = await requireRole(["OPERATOR", "ADMIN"], "/operator");
   const filters = await searchParams;
@@ -64,8 +74,20 @@ export default async function OperatorPage({
 
   const listingFilter = filters.listingFilter ?? "all";
   const bookingFilter = filters.bookingFilter ?? "all";
+  const listingSearch = filters.listingSearch?.trim().toLowerCase() ?? "";
+  const bookingSearch = filters.bookingSearch?.trim().toLowerCase() ?? "";
 
   const filteredListings = data.listings.filter((listing) => {
+    const matchesSearch =
+      listingSearch.length === 0 ||
+      [listing.title, listing.city, listing.state, listing.status].some((value) =>
+        value.toLowerCase().includes(listingSearch),
+      );
+
+    if (!matchesSearch) {
+      return false;
+    }
+
     switch (listingFilter) {
       case "active":
         return listing.status === "ACTIVE";
@@ -83,6 +105,16 @@ export default async function OperatorPage({
   });
 
   const filteredBookings = data.bookings.filter((booking) => {
+    const matchesSearch =
+      bookingSearch.length === 0 ||
+      [booking.listingTitle, booking.customerName, booking.city, booking.status, booking.verificationStatus].some((value) =>
+        value.toLowerCase().includes(bookingSearch),
+      );
+
+    if (!matchesSearch) {
+      return false;
+    }
+
     switch (bookingFilter) {
       case "attention":
         return (
@@ -187,28 +219,49 @@ export default async function OperatorPage({
 
       <div className="mt-8 grid gap-6 xl:grid-cols-[1.3fr_1fr]">
         <section id="operator-listings" className="rounded-2xl border border-slate-800 bg-slate-900 p-6 scroll-mt-24">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-4">
             <div>
               <h2 className="text-xl font-semibold">Listings</h2>
               <span className="text-sm text-slate-400">{filteredListings.length} shown</span>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {listingFilters.map((filter) => {
-                const isActive = listingFilter === filter.key;
-                return (
-                  <Link
-                    key={filter.key}
-                    href={buildFilterHref(filters, "listingFilter", filter.key)}
-                    className={`rounded-full border px-3 py-1.5 text-xs transition ${
-                      isActive
-                        ? "border-orange-400 bg-orange-500/15 text-orange-200"
-                        : "border-slate-700 text-slate-300 hover:border-slate-500"
-                    }`}
-                  >
-                    {filter.label} · {filter.count}
-                  </Link>
-                );
-              })}
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-wrap gap-2">
+                {listingFilters.map((filter) => {
+                  const isActive = listingFilter === filter.key;
+                  return (
+                    <Link
+                      key={filter.key}
+                      href={buildFilterHref(filters, "listingFilter", filter.key)}
+                      className={`rounded-full border px-3 py-1.5 text-xs transition ${
+                        isActive
+                          ? "border-orange-400 bg-orange-500/15 text-orange-200"
+                          : "border-slate-700 text-slate-300 hover:border-slate-500"
+                      }`}
+                    >
+                      {filter.label} · {filter.count}
+                    </Link>
+                  );
+                })}
+              </div>
+
+              <form method="get" className="flex flex-wrap items-center gap-2">
+                {listingFilter !== "all" ? <input type="hidden" name="listingFilter" value={listingFilter} /> : null}
+                {bookingFilter !== "all" ? <input type="hidden" name="bookingFilter" value={bookingFilter} /> : null}
+                {bookingSearch ? <input type="hidden" name="bookingSearch" value={bookingSearch} /> : null}
+                <input
+                  type="search"
+                  name="listingSearch"
+                  defaultValue={filters.listingSearch ?? ""}
+                  placeholder="Search listings"
+                  className="w-full min-w-[220px] rounded-full border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm text-slate-100 outline-none transition focus:border-orange-400 lg:w-auto"
+                />
+                <button
+                  type="submit"
+                  className="rounded-full border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500"
+                >
+                  Apply
+                </button>
+              </form>
             </div>
           </div>
 
@@ -260,28 +313,49 @@ export default async function OperatorPage({
         </section>
 
         <section id="operator-bookings" className="rounded-2xl border border-slate-800 bg-slate-900 p-6 scroll-mt-24">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-4">
             <div>
               <h2 className="text-xl font-semibold">Recent bookings</h2>
               <span className="text-sm text-slate-400">{filteredBookings.length} shown</span>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {bookingFilters.map((filter) => {
-                const isActive = bookingFilter === filter.key;
-                return (
-                  <Link
-                    key={filter.key}
-                    href={buildFilterHref(filters, "bookingFilter", filter.key)}
-                    className={`rounded-full border px-3 py-1.5 text-xs transition ${
-                      isActive
-                        ? "border-orange-400 bg-orange-500/15 text-orange-200"
-                        : "border-slate-700 text-slate-300 hover:border-slate-500"
-                    }`}
-                  >
-                    {filter.label} · {filter.count}
-                  </Link>
-                );
-              })}
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-wrap gap-2">
+                {bookingFilters.map((filter) => {
+                  const isActive = bookingFilter === filter.key;
+                  return (
+                    <Link
+                      key={filter.key}
+                      href={buildFilterHref(filters, "bookingFilter", filter.key)}
+                      className={`rounded-full border px-3 py-1.5 text-xs transition ${
+                        isActive
+                          ? "border-orange-400 bg-orange-500/15 text-orange-200"
+                          : "border-slate-700 text-slate-300 hover:border-slate-500"
+                      }`}
+                    >
+                      {filter.label} · {filter.count}
+                    </Link>
+                  );
+                })}
+              </div>
+
+              <form method="get" className="flex flex-wrap items-center gap-2">
+                {listingFilter !== "all" ? <input type="hidden" name="listingFilter" value={listingFilter} /> : null}
+                {listingSearch ? <input type="hidden" name="listingSearch" value={listingSearch} /> : null}
+                {bookingFilter !== "all" ? <input type="hidden" name="bookingFilter" value={bookingFilter} /> : null}
+                <input
+                  type="search"
+                  name="bookingSearch"
+                  defaultValue={filters.bookingSearch ?? ""}
+                  placeholder="Search bookings"
+                  className="w-full min-w-[220px] rounded-full border border-slate-700 bg-slate-950/70 px-4 py-2 text-sm text-slate-100 outline-none transition focus:border-orange-400 lg:w-auto"
+                />
+                <button
+                  type="submit"
+                  className="rounded-full border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500"
+                >
+                  Apply
+                </button>
+              </form>
             </div>
           </div>
 
