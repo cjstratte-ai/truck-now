@@ -382,6 +382,17 @@ export default async function OperatorPage({
     }
   });
 
+  const listingBulkReadyCounts = {
+    submit: sortedListings.filter((listing) => listing.status === "DRAFT" || listing.status === "REJECTED").length,
+    archive: sortedListings.filter((listing) => listing.status === "ACTIVE").length,
+    restore: sortedListings.filter((listing) => listing.status === "ARCHIVED").length,
+  };
+
+  const bookingBulkReadyCounts = {
+    approve: sortedBookings.filter((booking) => booking.status === "REQUESTED" && booking.verificationStatus !== "REJECTED").length,
+    reject: sortedBookings.filter((booking) => booking.status !== "PAID").length,
+  };
+
   const listingFilters = [
     { key: "all", label: "All", count: data.listings.length },
     { key: "active", label: "Active", count: data.listings.filter((listing) => listing.status === "ACTIVE").length },
@@ -697,7 +708,14 @@ export default async function OperatorPage({
                     <p className="text-xs text-slate-400">Submit drafts, archive active inventory, or restore archived listings in one pass.</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <BulkSelectControls targetName="listingIds" />
+                    <BulkSelectControls
+                      targetName="listingIds"
+                      selectOptions={[
+                        { label: `Select submittable (${listingBulkReadyCounts.submit})`, value: "submit" },
+                        { label: `Select archivable (${listingBulkReadyCounts.archive})`, value: "archive" },
+                        { label: `Select restorable (${listingBulkReadyCounts.restore})`, value: "restore" },
+                      ]}
+                    />
                     <button
                       type="submit"
                       name="nextStatus"
@@ -740,6 +758,15 @@ export default async function OperatorPage({
                       type="checkbox"
                       name="listingIds"
                       value={listing.id}
+                      data-bulk-tags={
+                        listing.status === "DRAFT" || listing.status === "REJECTED"
+                          ? "submit"
+                          : listing.status === "ACTIVE"
+                            ? "archive"
+                            : listing.status === "ARCHIVED"
+                              ? "restore"
+                              : ""
+                      }
                       className="mt-4 h-4 w-4 rounded border-slate-600 bg-slate-950 text-orange-500 focus:ring-orange-400"
                     />
                     <div className="flex flex-1 flex-col gap-4 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
@@ -764,6 +791,21 @@ export default async function OperatorPage({
                           </span>
                           <span className="text-sm font-medium text-slate-200">{formatCurrency(listing.dailyRate)}/day</span>
                         </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 text-[11px] uppercase tracking-wide text-slate-400">
+                        {listing.status === "DRAFT" || listing.status === "REJECTED" ? (
+                          <span className="rounded-full border border-orange-500/30 bg-orange-500/10 px-3 py-1 text-orange-200">Bulk submit ready</span>
+                        ) : null}
+                        {listing.status === "ACTIVE" ? (
+                          <span className="rounded-full border border-slate-600 px-3 py-1 text-slate-300">Bulk archive ready</span>
+                        ) : null}
+                        {listing.status === "ARCHIVED" ? (
+                          <span className="rounded-full border border-slate-600 px-3 py-1 text-slate-300">Bulk restore ready</span>
+                        ) : null}
+                        {!["DRAFT", "REJECTED", "ACTIVE", "ARCHIVED"].includes(listing.status) ? (
+                          <span className="rounded-full border border-slate-800 px-3 py-1 text-slate-500">Use individual workflow</span>
+                        ) : null}
                       </div>
 
                       <div className="flex flex-wrap gap-3">
@@ -905,7 +947,13 @@ export default async function OperatorPage({
                     <p className="text-xs text-slate-400">Approve or reject selected booking requests in one pass.</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <BulkSelectControls targetName="bookingIds" />
+                    <BulkSelectControls
+                      targetName="bookingIds"
+                      selectOptions={[
+                        { label: `Select approvable (${bookingBulkReadyCounts.approve})`, value: "approve" },
+                        { label: `Select rejectable (${bookingBulkReadyCounts.reject})`, value: "reject" },
+                      ]}
+                    />
                     <button
                       type="submit"
                       name="nextStatus"
@@ -946,6 +994,13 @@ export default async function OperatorPage({
                       type="checkbox"
                       name="bookingIds"
                       value={booking.id}
+                      data-bulk-tags={
+                        booking.status === "REQUESTED" && booking.verificationStatus !== "REJECTED"
+                          ? "approve,reject"
+                          : booking.status !== "PAID"
+                            ? "reject"
+                            : ""
+                      }
                       className="mt-4 h-4 w-4 rounded border-slate-600 bg-slate-950 text-orange-500 focus:ring-orange-400"
                     />
                     <div className="flex-1 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
@@ -961,6 +1016,17 @@ export default async function OperatorPage({
                         <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(booking.status)}`}>
                           {booking.status.replaceAll("_", " ")}
                         </span>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2 text-[11px] uppercase tracking-wide text-slate-400">
+                        {booking.status === "REQUESTED" && booking.verificationStatus !== "REJECTED" ? (
+                          <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-emerald-200">Bulk approve ready</span>
+                        ) : null}
+                        {booking.status !== "PAID" ? (
+                          <span className="rounded-full border border-rose-500/30 bg-rose-500/10 px-3 py-1 text-rose-200">Bulk reject ready</span>
+                        ) : null}
+                        {booking.status === "PAID" ? (
+                          <span className="rounded-full border border-slate-800 px-3 py-1 text-slate-500">Paid bookings stay single-item</span>
+                        ) : null}
                       </div>
                       <p className="mt-2 text-sm text-slate-400">
                         {booking.customerName} in {booking.city}
