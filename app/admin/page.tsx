@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { bulkReviewListings, bulkUpdateBookingStatuses, bulkUpdateVerificationStatuses } from "@/app/actions";
 import { requireRole } from "@/src/lib/auth";
 import { getAdminDashboardData } from "@/src/lib/inventory";
 
@@ -232,6 +233,7 @@ export default async function AdminPage({
   const bookingWindow = filters.bookingWindow ?? "all";
   const bookingPayment = filters.bookingPayment ?? "all";
   const todayKey = getLocalDayKey(new Date().toISOString());
+  const currentAdminHref = buildAdminHref(filters, {});
   const listingStatuses = new Set(parseSelectedStatuses(filters.listingStatuses));
   const bookingStatuses = new Set(parseSelectedStatuses(filters.bookingStatuses));
   const verificationStatuses = new Set(parseSelectedStatuses(filters.verificationStatuses));
@@ -711,7 +713,42 @@ export default async function AdminPage({
             </form>
           </div>
 
-          <div className="mt-4 space-y-3">
+          <form action={bulkReviewListings} className="mt-4 space-y-3">
+            <input type="hidden" name="returnTo" value={currentAdminHref} />
+            {sortedListings.length > 0 ? (
+              <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-slate-100">Bulk listing review</p>
+                    <p className="text-xs text-slate-400">Select pending items below, then approve or reject them together.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="submit"
+                      name="nextStatus"
+                      value="ACTIVE"
+                      className="rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-medium text-slate-950 transition hover:bg-emerald-400"
+                    >
+                      Approve selected
+                    </button>
+                    <button
+                      type="submit"
+                      name="nextStatus"
+                      value="REJECTED"
+                      className="rounded-full border border-rose-400 px-3 py-1.5 text-xs font-medium text-rose-200 transition hover:bg-rose-500/10"
+                    >
+                      Reject selected
+                    </button>
+                  </div>
+                </div>
+                <textarea
+                  name="reviewNotes"
+                  rows={2}
+                  placeholder="Optional shared rejection note"
+                  className="mt-3 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-orange-400"
+                />
+              </div>
+            ) : null}
             {sortedListings.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/40 p-6 text-sm text-slate-300">
                 No listings match this view right now.
@@ -721,37 +758,45 @@ export default async function AdminPage({
                 const ageMeta = getAgeMeta(listing.createdAt, listing.status === "ACTIVE" ? 10 : 4);
 
                 return (
-                  <div key={listing.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="font-semibold">{listing.title}</h3>
-                        {ageMeta ? (
-                          <span className={`rounded-full px-3 py-1 text-[11px] font-medium ${ageMeta.className}`}>
-                            {ageMeta.label}
-                          </span>
-                        ) : null}
+                  <div key={listing.id} className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      name="listingIds"
+                      value={listing.id}
+                      className="mt-4 h-4 w-4 rounded border-slate-600 bg-slate-950 text-orange-500 focus:ring-orange-400"
+                    />
+                    <div className="flex-1 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-semibold">{listing.title}</h3>
+                          {ageMeta ? (
+                            <span className={`rounded-full px-3 py-1 text-[11px] font-medium ${ageMeta.className}`}>
+                              {ageMeta.label}
+                            </span>
+                          ) : null}
+                        </div>
+                        <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(listing.status)}`}>
+                          {listing.status.replaceAll("_", " ")}
+                        </span>
                       </div>
-                      <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(listing.status)}`}>
-                        {listing.status.replaceAll("_", " ")}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-sm text-slate-400">
-                      {listing.city}, {listing.state}
-                    </p>
+                      <p className="mt-2 text-sm text-slate-400">
+                        {listing.city}, {listing.state}
+                      </p>
 
-                    <div className="mt-4 flex flex-wrap gap-3">
-                      <Link
-                        href={`/admin/listings/${listing.id}`}
-                        className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
-                      >
-                        Open review
-                      </Link>
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        <Link
+                          href={`/admin/listings/${listing.id}`}
+                          className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
+                        >
+                          Open review
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 );
               })
             )}
-          </div>
+          </form>
         </section>
 
         <section id="admin-booking-review" className="rounded-2xl border border-slate-800 bg-slate-900 p-6 scroll-mt-24">
@@ -871,7 +916,42 @@ export default async function AdminPage({
             </form>
           </div>
 
-          <div className="mt-4 space-y-3">
+          <form action={bulkUpdateBookingStatuses} className="mt-4 space-y-3">
+            <input type="hidden" name="returnTo" value={currentAdminHref} />
+            {sortedBookings.length > 0 ? (
+              <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-slate-100">Bulk booking review</p>
+                    <p className="text-xs text-slate-400">Approve or reject selected requests in one pass.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="submit"
+                      name="nextStatus"
+                      value="APPROVED"
+                      className="rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-medium text-slate-950 transition hover:bg-emerald-400"
+                    >
+                      Approve selected
+                    </button>
+                    <button
+                      type="submit"
+                      name="nextStatus"
+                      value="REJECTED"
+                      className="rounded-full border border-rose-400 px-3 py-1.5 text-xs font-medium text-rose-200 transition hover:bg-rose-500/10"
+                    >
+                      Reject selected
+                    </button>
+                  </div>
+                </div>
+                <textarea
+                  name="statusNote"
+                  rows={2}
+                  placeholder="Optional shared booking note"
+                  className="mt-3 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-orange-400"
+                />
+              </div>
+            ) : null}
             {sortedBookings.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/40 p-6 text-sm text-slate-300">
                 No bookings match this view right now.
@@ -881,44 +961,52 @@ export default async function AdminPage({
                 const ageMeta = getAgeMeta(booking.createdAt, booking.status === "APPROVED" ? 2 : 3);
 
                 return (
-                  <div key={booking.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="font-semibold">{booking.listingTitle}</h3>
-                        {ageMeta ? (
-                          <span className={`rounded-full px-3 py-1 text-[11px] font-medium ${ageMeta.className}`}>
-                            {ageMeta.label}
-                          </span>
-                        ) : null}
+                  <div key={booking.id} className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      name="bookingIds"
+                      value={booking.id}
+                      className="mt-4 h-4 w-4 rounded border-slate-600 bg-slate-950 text-orange-500 focus:ring-orange-400"
+                    />
+                    <div className="flex-1 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-semibold">{booking.listingTitle}</h3>
+                          {ageMeta ? (
+                            <span className={`rounded-full px-3 py-1 text-[11px] font-medium ${ageMeta.className}`}>
+                              {ageMeta.label}
+                            </span>
+                          ) : null}
+                        </div>
+                        <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(booking.status)}`}>
+                          {booking.status.replaceAll("_", " ")}
+                        </span>
                       </div>
-                      <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(booking.status)}`}>
-                        {booking.status.replaceAll("_", " ")}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-sm text-slate-400">{booking.customerName}</p>
-                    <p className="mt-1 text-sm text-slate-400">
-                      {formatDate(booking.startDate)} to {formatDate(booking.endDate)}
-                    </p>
-                    <div className="mt-3 flex items-center gap-2 text-sm">
-                      <span className="rounded-full bg-slate-700 px-3 py-1 text-[11px] font-medium text-slate-200">
-                        {booking.paymentStatus.replaceAll("_", " ")}
-                      </span>
-                      <span className="font-medium text-slate-200">{formatCurrency(booking.totalAmount)}</span>
-                    </div>
+                      <p className="mt-2 text-sm text-slate-400">{booking.customerName}</p>
+                      <p className="mt-1 text-sm text-slate-400">
+                        {formatDate(booking.startDate)} to {formatDate(booking.endDate)}
+                      </p>
+                      <div className="mt-3 flex items-center gap-2 text-sm">
+                        <span className="rounded-full bg-slate-700 px-3 py-1 text-[11px] font-medium text-slate-200">
+                          {booking.paymentStatus.replaceAll("_", " ")}
+                        </span>
+                        <span className="font-medium text-slate-200">{formatCurrency(booking.totalAmount)}</span>
+                      </div>
 
-                    <div className="mt-4 flex flex-wrap gap-3">
-                      <Link
-                        href={`/admin/bookings/${booking.id}`}
-                        className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
-                      >
-                        Review request
-                      </Link>
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        <Link
+                          href={`/admin/bookings/${booking.id}`}
+                          className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
+                        >
+                          Review request
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 );
               })
             )}
-          </div>
+          </form>
         </section>
 
         <section id="admin-verification-queue" className="rounded-2xl border border-slate-800 bg-slate-900 p-6 scroll-mt-24">
@@ -1036,7 +1124,42 @@ export default async function AdminPage({
             </form>
           </div>
 
-          <div className="mt-4 space-y-3">
+          <form action={bulkUpdateVerificationStatuses} className="mt-4 space-y-3">
+            <input type="hidden" name="returnTo" value={currentAdminHref} />
+            {sortedVerificationQueue.length > 0 ? (
+              <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-slate-100">Bulk verification review</p>
+                    <p className="text-xs text-slate-400">Clear or reject multiple verification items together.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="submit"
+                      name="nextStatus"
+                      value="APPROVED"
+                      className="rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-medium text-slate-950 transition hover:bg-emerald-400"
+                    >
+                      Approve selected
+                    </button>
+                    <button
+                      type="submit"
+                      name="nextStatus"
+                      value="REJECTED"
+                      className="rounded-full border border-rose-400 px-3 py-1.5 text-xs font-medium text-rose-200 transition hover:bg-rose-500/10"
+                    >
+                      Reject selected
+                    </button>
+                  </div>
+                </div>
+                <textarea
+                  name="verificationNote"
+                  rows={2}
+                  placeholder="Optional shared verification note"
+                  className="mt-3 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-orange-400"
+                />
+              </div>
+            ) : null}
             {sortedVerificationQueue.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/40 p-6 text-sm text-slate-300">
                 No verification items match this view right now.
@@ -1046,43 +1169,51 @@ export default async function AdminPage({
                 const ageMeta = getAgeMeta(booking.createdAt, booking.verificationStatus === "APPROVED" ? 2 : 3);
 
                 return (
-                  <div key={booking.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="font-semibold">{booking.customerName}</h3>
-                        {ageMeta ? (
-                          <span className={`rounded-full px-3 py-1 text-[11px] font-medium ${ageMeta.className}`}>
-                            {ageMeta.label}
-                          </span>
-                        ) : null}
+                  <div key={booking.id} className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      name="bookingIds"
+                      value={booking.id}
+                      className="mt-4 h-4 w-4 rounded border-slate-600 bg-slate-950 text-orange-500 focus:ring-orange-400"
+                    />
+                    <div className="flex-1 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-semibold">{booking.customerName}</h3>
+                          {ageMeta ? (
+                            <span className={`rounded-full px-3 py-1 text-[11px] font-medium ${ageMeta.className}`}>
+                              {ageMeta.label}
+                            </span>
+                          ) : null}
+                        </div>
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(booking.verificationStatus)}`}
+                        >
+                          {booking.verificationStatus.replaceAll("_", " ")}
+                        </span>
                       </div>
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(booking.verificationStatus)}`}
-                      >
-                        {booking.verificationStatus.replaceAll("_", " ")}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-sm text-slate-400">{booking.listingTitle}</p>
-                    <div className="mt-3 flex items-center gap-2 text-sm">
-                      <span className="rounded-full bg-slate-700 px-3 py-1 text-[11px] font-medium text-slate-200">
-                        {booking.paymentStatus.replaceAll("_", " ")}
-                      </span>
-                      <span className="font-medium text-slate-200">{formatCurrency(booking.totalAmount)}</span>
-                    </div>
+                      <p className="mt-2 text-sm text-slate-400">{booking.listingTitle}</p>
+                      <div className="mt-3 flex items-center gap-2 text-sm">
+                        <span className="rounded-full bg-slate-700 px-3 py-1 text-[11px] font-medium text-slate-200">
+                          {booking.paymentStatus.replaceAll("_", " ")}
+                        </span>
+                        <span className="font-medium text-slate-200">{formatCurrency(booking.totalAmount)}</span>
+                      </div>
 
-                    <div className="mt-4 flex flex-wrap gap-3">
-                      <Link
-                        href={`/admin/bookings/${booking.id}`}
-                        className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
-                      >
-                        Check verification
-                      </Link>
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        <Link
+                          href={`/admin/bookings/${booking.id}`}
+                          className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
+                        >
+                          Check verification
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 );
               })
             )}
-          </div>
+          </form>
         </section>
       </div>
     </main>
