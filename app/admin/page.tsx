@@ -466,6 +466,21 @@ export default async function AdminPage({
     }
   });
 
+  const listingBulkReadyCounts = {
+    approve: sortedListings.filter((listing) => listing.status === "PENDING_APPROVAL").length,
+    reject: sortedListings.filter((listing) => listing.status === "PENDING_APPROVAL").length,
+  };
+
+  const bookingBulkReadyCounts = {
+    approve: sortedBookings.filter((booking) => booking.status === "REQUESTED" && booking.verificationStatus !== "REJECTED").length,
+    reject: sortedBookings.filter((booking) => booking.status !== "PAID").length,
+  };
+
+  const verificationBulkReadyCounts = {
+    approve: sortedVerificationQueue.filter((booking) => booking.verificationStatus === "PENDING").length,
+    reject: sortedVerificationQueue.filter((booking) => booking.verificationStatus === "PENDING").length,
+  };
+
   const listingFilters = [
     { key: "all", label: "All", count: data.listings.length },
     {
@@ -820,7 +835,13 @@ export default async function AdminPage({
                     <p className="text-xs text-slate-400">Select pending items below, then approve or reject them together.</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <BulkSelectControls targetName="listingIds" />
+                    <BulkSelectControls
+                      targetName="listingIds"
+                      selectOptions={[
+                        { label: `Select approvable (${listingBulkReadyCounts.approve})`, value: "approve" },
+                        { label: `Select rejectable (${listingBulkReadyCounts.reject})`, value: "reject" },
+                      ]}
+                    />
                     <button
                       type="submit"
                       name="nextStatus"
@@ -861,6 +882,7 @@ export default async function AdminPage({
                       type="checkbox"
                       name="listingIds"
                       value={listing.id}
+                      data-bulk-tags={listing.status === "PENDING_APPROVAL" ? "approve,reject" : ""}
                       className="mt-4 h-4 w-4 rounded border-slate-600 bg-slate-950 text-orange-500 focus:ring-orange-400"
                     />
                     <div className="flex-1 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
@@ -876,6 +898,14 @@ export default async function AdminPage({
                         <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(listing.status)}`}>
                           {listing.status.replaceAll("_", " ")}
                         </span>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2 text-[11px] uppercase tracking-wide text-slate-400">
+                        {listing.status === "PENDING_APPROVAL" ? (
+                          <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-emerald-200">Bulk approve or reject ready</span>
+                        ) : null}
+                        {listing.status !== "PENDING_APPROVAL" ? (
+                          <span className="rounded-full border border-slate-800 px-3 py-1 text-slate-500">Already resolved</span>
+                        ) : null}
                       </div>
                       <p className="mt-2 text-sm text-slate-400">
                         {listing.city}, {listing.state}
@@ -1024,7 +1054,13 @@ export default async function AdminPage({
                     <p className="text-xs text-slate-400">Approve or reject selected requests in one pass.</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <BulkSelectControls targetName="bookingIds" />
+                    <BulkSelectControls
+                      targetName="bookingIds"
+                      selectOptions={[
+                        { label: `Select approvable (${bookingBulkReadyCounts.approve})`, value: "approve" },
+                        { label: `Select rejectable (${bookingBulkReadyCounts.reject})`, value: "reject" },
+                      ]}
+                    />
                     <button
                       type="submit"
                       name="nextStatus"
@@ -1065,6 +1101,13 @@ export default async function AdminPage({
                       type="checkbox"
                       name="bookingIds"
                       value={booking.id}
+                      data-bulk-tags={
+                        booking.status === "REQUESTED" && booking.verificationStatus !== "REJECTED"
+                          ? "approve,reject"
+                          : booking.status !== "PAID"
+                            ? "reject"
+                            : ""
+                      }
                       className="mt-4 h-4 w-4 rounded border-slate-600 bg-slate-950 text-orange-500 focus:ring-orange-400"
                     />
                     <div className="flex-1 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
@@ -1080,6 +1123,17 @@ export default async function AdminPage({
                         <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(booking.status)}`}>
                           {booking.status.replaceAll("_", " ")}
                         </span>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2 text-[11px] uppercase tracking-wide text-slate-400">
+                        {booking.status === "REQUESTED" && booking.verificationStatus !== "REJECTED" ? (
+                          <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-emerald-200">Bulk approve ready</span>
+                        ) : null}
+                        {booking.status !== "PAID" ? (
+                          <span className="rounded-full border border-rose-500/30 bg-rose-500/10 px-3 py-1 text-rose-200">Bulk reject ready</span>
+                        ) : null}
+                        {booking.status === "PAID" ? (
+                          <span className="rounded-full border border-slate-800 px-3 py-1 text-slate-500">Paid bookings stay single-item</span>
+                        ) : null}
                       </div>
                       <p className="mt-2 text-sm text-slate-400">{booking.customerName}</p>
                       <p className="mt-1 text-sm text-slate-400">
@@ -1233,7 +1287,13 @@ export default async function AdminPage({
                     <p className="text-xs text-slate-400">Clear or reject multiple verification items together.</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <BulkSelectControls targetName="bookingIds" />
+                    <BulkSelectControls
+                      targetName="bookingIds"
+                      selectOptions={[
+                        { label: `Select clearable (${verificationBulkReadyCounts.approve})`, value: "approve" },
+                        { label: `Select rejectable (${verificationBulkReadyCounts.reject})`, value: "reject" },
+                      ]}
+                    />
                     <button
                       type="submit"
                       name="nextStatus"
@@ -1274,6 +1334,7 @@ export default async function AdminPage({
                       type="checkbox"
                       name="bookingIds"
                       value={booking.id}
+                      data-bulk-tags={booking.verificationStatus === "PENDING" ? "approve,reject" : ""}
                       className="mt-4 h-4 w-4 rounded border-slate-600 bg-slate-950 text-orange-500 focus:ring-orange-400"
                     />
                     <div className="flex-1 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
@@ -1291,6 +1352,14 @@ export default async function AdminPage({
                         >
                           {booking.verificationStatus.replaceAll("_", " ")}
                         </span>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2 text-[11px] uppercase tracking-wide text-slate-400">
+                        {booking.verificationStatus === "PENDING" ? (
+                          <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-emerald-200">Bulk clear or reject ready</span>
+                        ) : null}
+                        {booking.verificationStatus !== "PENDING" ? (
+                          <span className="rounded-full border border-slate-800 px-3 py-1 text-slate-500">Already resolved</span>
+                        ) : null}
                       </div>
                       <p className="mt-2 text-sm text-slate-400">{booking.listingTitle}</p>
                       <div className="mt-3 flex items-center gap-2 text-sm">
