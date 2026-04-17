@@ -117,6 +117,7 @@ export type OperatorListingDetail = {
     description: string;
     ownerName: string;
     photoUrls: string[];
+    reviewNotes: string | null;
   };
   stats: {
     recentBookings: number;
@@ -188,6 +189,7 @@ export type AdminListingReviewDetail = {
     boxSizeFeet: number | null;
     passengerCapacity: number | null;
     hasRamp: boolean;
+    reviewNotes: string | null;
   };
   actionItems: string[];
   checklist: string[];
@@ -210,6 +212,7 @@ type ListingRecord = InventoryItem & {
   status: string;
   ownerName: string;
   ownerEmail: string;
+  reviewNotes: string | null;
 };
 
 type BookingRecord = {
@@ -257,6 +260,7 @@ const fallbackListings: ListingRecord[] = [
     passengerCapacity: 5,
     hasRamp: false,
     description: "Reliable heavy-duty truck rental in Dallas for hauling, moving, and work-site jobs.",
+    reviewNotes: null,
     city: "Dallas",
     state: "TX",
     dailyRate: 14900,
@@ -277,6 +281,7 @@ const fallbackListings: ListingRecord[] = [
     passengerCapacity: 3,
     hasRamp: true,
     description: "Popular Houston box truck for deliveries, business rentals, and multi-stop move days.",
+    reviewNotes: null,
     city: "Houston",
     state: "TX",
     dailyRate: 17900,
@@ -294,6 +299,7 @@ const fallbackListings: ListingRecord[] = [
     passengerCapacity: 5,
     hasRamp: false,
     description: "Utility truck listing waiting on final admin approval before it can go live in Austin.",
+    reviewNotes: null,
     city: "Austin",
     state: "TX",
     dailyRate: 15900,
@@ -310,11 +316,12 @@ const fallbackListings: ListingRecord[] = [
     boxSizeFeet: null,
     passengerCapacity: 5,
     hasRamp: false,
-    description: "Draft listing that still needs photos, delivery rules, and operator notes before review.",
+    description: "Heavy-duty pickup listing that needs clearer photos and pickup instructions before it goes live.",
+    reviewNotes: "Add at least two exterior photos and tighten the pickup instructions before resubmitting.",
     city: "San Antonio",
     state: "TX",
     dailyRate: 16900,
-    status: "DRAFT",
+    status: "REJECTED",
     ownerName: "Texas Fleet Rentals",
     ownerEmail: "operator@trucksnow.com",
   },
@@ -593,7 +600,7 @@ function mapAdminBookingReview(booking: BookingRecord): AdminBookingReview {
   };
 }
 
-function getOperatorListingActionItems(status: string) {
+function getOperatorListingActionItems(status: string, reviewNotes?: string | null) {
   if (status === "PENDING_APPROVAL") {
     return [
       "Confirm the photo set, description, and daily rate are final before nudging admin review.",
@@ -607,6 +614,16 @@ function getOperatorListingActionItems(status: string) {
       "Finish the listing description and add final pickup notes.",
       "Confirm pricing and availability windows before sending for approval.",
       "Review the public preview to make sure the listing reads clearly for renters.",
+    ];
+  }
+
+  if (status === "REJECTED") {
+    return [
+      reviewNotes
+        ? `Start with the admin feedback: ${reviewNotes}`
+        : "Start with the admin feedback and tighten the renter-facing presentation before resubmitting.",
+      "Update photos, pickup instructions, and pricing details so the next review can move quickly.",
+      "Use the customer preview to make sure the revised listing reads clearly before sending it back for approval.",
     ];
   }
 
@@ -736,6 +753,7 @@ async function loadCatalog(): Promise<CatalogData> {
           title: true,
           vehicleType: true,
           description: true,
+          reviewNotes: true,
           photoUrls: true,
           boxSizeFeet: true,
           passengerCapacity: true,
@@ -814,6 +832,7 @@ async function loadCatalog(): Promise<CatalogData> {
       title: string;
       vehicleType: string;
       description: string;
+      reviewNotes: string | null;
       photoUrls: string[];
       boxSizeFeet: number | null;
       passengerCapacity: number | null;
@@ -875,6 +894,7 @@ async function loadCatalog(): Promise<CatalogData> {
         title: listing.title,
         vehicleType: listing.vehicleType,
         description: listing.description,
+        reviewNotes: listing.reviewNotes,
         photoUrls: listing.photoUrls,
         boxSizeFeet: listing.boxSizeFeet,
         passengerCapacity: listing.passengerCapacity,
@@ -1141,6 +1161,7 @@ export async function getOperatorListingDetail(id: string, ownerEmail?: string):
       description: listing.description,
       ownerName: listing.ownerName,
       photoUrls: listing.photoUrls,
+      reviewNotes: listing.reviewNotes,
       vehicleType: listing.vehicleType,
       boxSizeFeet: listing.boxSizeFeet,
       passengerCapacity: listing.passengerCapacity,
@@ -1151,7 +1172,7 @@ export async function getOperatorListingDetail(id: string, ownerEmail?: string):
       requestedBookings: relatedBookings.filter((booking) => booking.status === "REQUESTED").length,
       paidBookings: relatedBookings.filter((booking) => booking.status === "PAID").length,
     },
-    actionItems: getOperatorListingActionItems(listing.status),
+    actionItems: getOperatorListingActionItems(listing.status, listing.reviewNotes),
   };
 }
 
@@ -1227,6 +1248,7 @@ export async function getAdminListingReviewDetail(id: string): Promise<AdminList
       boxSizeFeet: listing.boxSizeFeet,
       passengerCapacity: listing.passengerCapacity,
       hasRamp: listing.hasRamp,
+      reviewNotes: listing.reviewNotes,
     },
     actionItems: getAdminListingActionItems(listing.status),
     checklist: [

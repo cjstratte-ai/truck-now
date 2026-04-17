@@ -146,9 +146,19 @@ export default async function AdminListingReviewPage({
               </button>
             </form>
 
-            <form action={reviewListing}>
+            <form action={reviewListing} className="flex min-w-[260px] flex-1 flex-col gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
               <input type="hidden" name="listingId" value={data.listing.id} />
               <input type="hidden" name="nextStatus" value="REJECTED" />
+              <label className="text-xs uppercase tracking-wide text-slate-500">
+                Listing feedback
+                <textarea
+                  name="reviewNotes"
+                  rows={4}
+                  defaultValue={data.listing.status === "REJECTED" ? data.listing.reviewNotes ?? "" : ""}
+                  placeholder="Tell the operator what needs to change before this listing comes back for approval."
+                  className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-rose-400"
+                />
+              </label>
               <button
                 type="submit"
                 className="rounded-lg bg-rose-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-rose-400"
@@ -164,6 +174,13 @@ export default async function AdminListingReviewPage({
               Preview customer view
             </Link>
           </div>
+
+          {data.listing.reviewNotes ? (
+            <div className="mt-6 rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-100">
+              <p className="font-medium text-rose-200">Current operator feedback</p>
+              <p className="mt-2 whitespace-pre-wrap">{data.listing.reviewNotes}</p>
+            </div>
+          ) : null}
         </section>
       </div>
     </main>

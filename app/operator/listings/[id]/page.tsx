@@ -108,6 +108,13 @@ export default async function OperatorListingDetailPage({
 
       {flash ? <div className={`mt-6 rounded-2xl border px-4 py-3 text-sm ${getFlashClasses(flash.tone)}`}>{flash.text}</div> : null}
 
+      {data.listing.reviewNotes ? (
+        <div className="mt-6 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-5 text-sm text-rose-100">
+          <p className="font-medium text-rose-200">Admin feedback</p>
+          <p className="mt-2 whitespace-pre-wrap">{data.listing.reviewNotes}</p>
+        </div>
+      ) : null}
+
       <div className="mt-8 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
         <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
           <h2 className="text-xl font-semibold">Listing pulse</h2>

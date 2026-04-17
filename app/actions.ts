@@ -388,6 +388,7 @@ export async function reviewListing(formData: FormData) {
 
   const listingId = getString(formData, "listingId");
   const nextStatus = getString(formData, "nextStatus") as "ACTIVE" | "REJECTED";
+  const reviewNotes = getString(formData, "reviewNotes");
   const returnTo = `/admin/listings/${listingId}`;
 
   if (!listingId || !["ACTIVE", "REJECTED"].includes(nextStatus)) {
@@ -407,6 +408,7 @@ export async function reviewListing(formData: FormData) {
       },
       data: {
         status: nextStatus,
+        reviewNotes: nextStatus === "REJECTED" ? reviewNotes || null : null,
       },
     });
 

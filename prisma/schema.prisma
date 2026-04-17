@@ -73,6 +73,7 @@ model Listing {
   slug        String        @unique
   vehicleType VehicleType   @default(OTHER)
   description String        @db.Text
+  reviewNotes String?       @db.Text
   photoUrls   String[]      @default([])
   boxSizeFeet Int?
   passengerCapacity Int?

@@ -54,6 +54,15 @@ export default async function OperatorPage() {
         </Link>
       </div>
 
+      <div className="mb-8 flex flex-wrap gap-3 text-sm">
+        <a href="#operator-listings" className="rounded-full border border-slate-700 px-3 py-1.5 text-slate-200 transition hover:border-slate-500">
+          Jump to listings
+        </a>
+        <a href="#operator-bookings" className="rounded-full border border-slate-700 px-3 py-1.5 text-slate-200 transition hover:border-slate-500">
+          Jump to bookings
+        </a>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <div className="rounded-xl border border-slate-800 bg-slate-900 p-6 xl:col-span-1">
           <p className="text-sm text-slate-400">Active listings</p>
@@ -78,7 +87,7 @@ export default async function OperatorPage() {
       </div>
 
       <div className="mt-8 grid gap-6 xl:grid-cols-[1.3fr_1fr]">
-        <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
+        <section id="operator-listings" className="rounded-2xl border border-slate-800 bg-slate-900 p-6 scroll-mt-24">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">Listings</h2>
             <span className="text-sm text-slate-400">{data.listings.length} total</span>
@@ -131,7 +140,7 @@ export default async function OperatorPage() {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
+        <section id="operator-bookings" className="rounded-2xl border border-slate-800 bg-slate-900 p-6 scroll-mt-24">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">Recent bookings</h2>
             <span className="text-sm text-slate-400">{data.bookings.length} shown</span>

@@ -40,6 +40,18 @@ export default async function AdminPage() {
         </p>
       </div>
 
+      <div className="mb-8 flex flex-wrap gap-3 text-sm">
+        <a href="#admin-listing-review" className="rounded-full border border-slate-700 px-3 py-1.5 text-slate-200 transition hover:border-slate-500">
+          Listing review
+        </a>
+        <a href="#admin-booking-review" className="rounded-full border border-slate-700 px-3 py-1.5 text-slate-200 transition hover:border-slate-500">
+          Booking review
+        </a>
+        <a href="#admin-verification-queue" className="rounded-full border border-slate-700 px-3 py-1.5 text-slate-200 transition hover:border-slate-500">
+          Verification queue
+        </a>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
           <p className="text-sm text-slate-400">Pending approvals</p>
@@ -60,7 +72,7 @@ export default async function AdminPage() {
       </div>
 
       <div className="mt-8 grid gap-6 xl:grid-cols-3">
-        <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
+        <section id="admin-listing-review" className="rounded-2xl border border-slate-800 bg-slate-900 p-6 scroll-mt-24">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">Listing review</h2>
             <span className="text-sm text-slate-400">{itemLabel(data.listingReviewQueue.length)}</span>
@@ -92,7 +104,7 @@ export default async function AdminPage() {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
+        <section id="admin-booking-review" className="rounded-2xl border border-slate-800 bg-slate-900 p-6 scroll-mt-24">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">Booking review</h2>
             <span className="text-sm text-slate-400">{itemLabel(data.bookingReviewQueue.length)}</span>
@@ -123,7 +135,7 @@ export default async function AdminPage() {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
+        <section id="admin-verification-queue" className="rounded-2xl border border-slate-800 bg-slate-900 p-6 scroll-mt-24">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">Verification queue</h2>
             <span className="text-sm text-slate-400">{itemLabel(data.verificationQueue.length)}</span>

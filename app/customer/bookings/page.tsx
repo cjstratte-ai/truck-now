@@ -38,6 +38,12 @@ function getStatusBadgeClasses(status: string) {
 export default async function CustomerBookingsPage() {
   const session = await requireRole(["CUSTOMER"], "/customer/bookings");
   const data = await getCustomerBookingsData(session.email.toLowerCase());
+  const requestedCount = data.bookings.filter((booking) => booking.status === "REQUESTED").length;
+  const approvedCount = data.bookings.filter((booking) => booking.status === "APPROVED").length;
+  const paidCount = data.bookings.filter((booking) => booking.status === "PAID").length;
+  const attentionCount = data.bookings.filter(
+    (booking) => booking.status === "REJECTED" || booking.verificationStatus === "REJECTED",
+  ).length;
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-6 py-16 text-white">
@@ -55,6 +61,25 @@ export default async function CustomerBookingsPage() {
         >
           Browse more trucks
         </Link>
+      </div>
+
+      <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+          <p className="text-sm text-slate-400">Requested</p>
+          <p className="mt-2 text-3xl font-semibold">{requestedCount}</p>
+        </div>
+        <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+          <p className="text-sm text-slate-400">Approved</p>
+          <p className="mt-2 text-3xl font-semibold">{approvedCount}</p>
+        </div>
+        <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+          <p className="text-sm text-slate-400">Paid</p>
+          <p className="mt-2 text-3xl font-semibold">{paidCount}</p>
+        </div>
+        <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+          <p className="text-sm text-slate-400">Needs attention</p>
+          <p className="mt-2 text-3xl font-semibold">{attentionCount}</p>
+        </div>
       </div>
 
       <div className="mt-8 space-y-4">
