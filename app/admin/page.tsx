@@ -18,6 +18,9 @@ type AdminFilters = {
   verificationAge?: string;
   bookingWindow?: string;
   bookingPayment?: string;
+  listingStatuses?: string | string[];
+  bookingStatuses?: string | string[];
+  verificationStatuses?: string | string[];
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -73,6 +76,16 @@ function getLocalDayKey(value: string) {
   return new Date(value).toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
 }
 
+function parseSelectedStatuses(value?: string | string[] | null) {
+  if (!value) {
+    return [] as string[];
+  }
+
+  const raw = Array.isArray(value) ? value : [value];
+
+  return [...new Set(raw.flatMap((item) => item.split(",")).map((item) => item.trim()).filter(Boolean))];
+}
+
 function getAgeMeta(value?: string | null, staleAfterDays = 3) {
   const diffDays = getAgeDays(value);
 
@@ -119,6 +132,9 @@ function buildAdminHref(current: AdminFilters, updates: Partial<Record<keyof Adm
   const listingSearch = next.listingSearch?.trim() ?? "";
   const bookingSearch = next.bookingSearch?.trim() ?? "";
   const verificationSearch = next.verificationSearch?.trim() ?? "";
+  const listingStatuses = parseSelectedStatuses(next.listingStatuses);
+  const bookingStatuses = parseSelectedStatuses(next.bookingStatuses);
+  const verificationStatuses = parseSelectedStatuses(next.verificationStatuses);
 
   if (listingFilter !== "all") {
     params.set("listingFilter", listingFilter);
@@ -142,6 +158,18 @@ function buildAdminHref(current: AdminFilters, updates: Partial<Record<keyof Adm
 
   if (verificationSearch) {
     params.set("verificationSearch", verificationSearch);
+  }
+
+  if (listingStatuses.length > 0) {
+    params.set("listingStatuses", listingStatuses.join(","));
+  }
+
+  if (bookingStatuses.length > 0) {
+    params.set("bookingStatuses", bookingStatuses.join(","));
+  }
+
+  if (verificationStatuses.length > 0) {
+    params.set("verificationStatuses", verificationStatuses.join(","));
   }
 
   if (listingAge !== "all") {
@@ -204,6 +232,9 @@ export default async function AdminPage({
   const bookingWindow = filters.bookingWindow ?? "all";
   const bookingPayment = filters.bookingPayment ?? "all";
   const todayKey = getLocalDayKey(new Date().toISOString());
+  const listingStatuses = new Set(parseSelectedStatuses(filters.listingStatuses));
+  const bookingStatuses = new Set(parseSelectedStatuses(filters.bookingStatuses));
+  const verificationStatuses = new Set(parseSelectedStatuses(filters.verificationStatuses));
 
   const filteredListings = data.listings.filter((listing) => {
     const matchesSearch =
@@ -221,6 +252,10 @@ export default async function AdminPage({
       if (ageDays === null || ageDays < 2) {
         return false;
       }
+    }
+
+    if (listingStatuses.size > 0 && !listingStatuses.has(listing.status)) {
+      return false;
     }
 
     switch (listingFilter) {
@@ -274,6 +309,10 @@ export default async function AdminPage({
       return false;
     }
 
+    if (bookingStatuses.size > 0 && !bookingStatuses.has(booking.status)) {
+      return false;
+    }
+
     switch (bookingFilter) {
       case "requested":
         return booking.status === "REQUESTED";
@@ -317,6 +356,10 @@ export default async function AdminPage({
       if (ageDays === null || ageDays < 2) {
         return false;
       }
+    }
+
+    if (verificationStatuses.size > 0 && !verificationStatuses.has(booking.verificationStatus)) {
+      return false;
     }
 
     switch (verificationFilter) {
@@ -402,6 +445,10 @@ export default async function AdminPage({
     { key: "amount-high", label: "Highest amount" },
     { key: "customer", label: "Customer" },
   ];
+
+  const listingStatusOptions = ["PENDING_APPROVAL", "REJECTED", "ACTIVE"];
+  const bookingStatusOptions = ["REQUESTED", "APPROVED", "PAID", "REJECTED"];
+  const verificationStatusOptions = ["PENDING", "APPROVED", "REJECTED"];
 
   const presets = [
     {
@@ -590,6 +637,11 @@ export default async function AdminPage({
               {verificationAge !== "all" ? <input type="hidden" name="verificationAge" value={verificationAge} /> : null}
               {bookingWindow !== "all" ? <input type="hidden" name="bookingWindow" value={bookingWindow} /> : null}
               {bookingPayment !== "all" ? <input type="hidden" name="bookingPayment" value={bookingPayment} /> : null}
+              {listingStatuses.size > 0 ? <input type="hidden" name="listingStatuses" value={[...listingStatuses].join(",")} /> : null}
+              {bookingStatuses.size > 0 ? <input type="hidden" name="bookingStatuses" value={[...bookingStatuses].join(",")} /> : null}
+              {verificationStatuses.size > 0 ? (
+                <input type="hidden" name="verificationStatuses" value={[...verificationStatuses].join(",")} />
+              ) : null}
               <input
                 type="search"
                 name="listingSearch"
@@ -614,6 +666,48 @@ export default async function AdminPage({
               >
                 Apply
               </button>
+            </form>
+
+            <form method="get" className="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
+              {listingFilter !== "all" ? <input type="hidden" name="listingFilter" value={listingFilter} /> : null}
+              {bookingFilter !== "requested" ? <input type="hidden" name="bookingFilter" value={bookingFilter} /> : null}
+              {verificationFilter !== "pending" ? <input type="hidden" name="verificationFilter" value={verificationFilter} /> : null}
+              {filters.listingSearch ? <input type="hidden" name="listingSearch" value={filters.listingSearch} /> : null}
+              {filters.bookingSearch ? <input type="hidden" name="bookingSearch" value={filters.bookingSearch} /> : null}
+              {filters.verificationSearch ? <input type="hidden" name="verificationSearch" value={filters.verificationSearch} /> : null}
+              {listingSort !== "age" ? <input type="hidden" name="listingSort" value={listingSort} /> : null}
+              {bookingSort !== "age" ? <input type="hidden" name="bookingSort" value={bookingSort} /> : null}
+              {verificationSort !== "age" ? <input type="hidden" name="verificationSort" value={verificationSort} /> : null}
+              {listingAge !== "all" ? <input type="hidden" name="listingAge" value={listingAge} /> : null}
+              {bookingAge !== "all" ? <input type="hidden" name="bookingAge" value={bookingAge} /> : null}
+              {verificationAge !== "all" ? <input type="hidden" name="verificationAge" value={verificationAge} /> : null}
+              {bookingWindow !== "all" ? <input type="hidden" name="bookingWindow" value={bookingWindow} /> : null}
+              {bookingPayment !== "all" ? <input type="hidden" name="bookingPayment" value={bookingPayment} /> : null}
+              {bookingStatuses.size > 0 ? <input type="hidden" name="bookingStatuses" value={[...bookingStatuses].join(",")} /> : null}
+              {verificationStatuses.size > 0 ? <input type="hidden" name="verificationStatuses" value={[...verificationStatuses].join(",")} /> : null}
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Editable status filter</p>
+              <div className="flex flex-wrap gap-3">
+                {listingStatusOptions.map((status) => (
+                  <label key={status} className="flex items-center gap-2 text-sm text-slate-200">
+                    <input
+                      type="checkbox"
+                      name="listingStatuses"
+                      value={status}
+                      defaultChecked={listingStatuses.has(status)}
+                      className="h-4 w-4 rounded border-slate-600 bg-slate-950 text-orange-500 focus:ring-orange-400"
+                    />
+                    {status.replaceAll("_", " ")}
+                  </label>
+                ))}
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button type="submit" className="rounded-full border border-slate-700 px-3 py-1.5 text-xs text-slate-200 transition hover:border-slate-500">
+                  Apply statuses
+                </button>
+                <Link href={buildAdminHref(filters, { listingStatuses: null })} className="rounded-full border border-slate-700 px-3 py-1.5 text-xs text-slate-300 transition hover:border-slate-500">
+                  Clear
+                </Link>
+              </div>
             </form>
           </div>
 
@@ -702,6 +796,11 @@ export default async function AdminPage({
               {verificationAge !== "all" ? <input type="hidden" name="verificationAge" value={verificationAge} /> : null}
               {bookingWindow !== "all" ? <input type="hidden" name="bookingWindow" value={bookingWindow} /> : null}
               {bookingPayment !== "all" ? <input type="hidden" name="bookingPayment" value={bookingPayment} /> : null}
+              {listingStatuses.size > 0 ? <input type="hidden" name="listingStatuses" value={[...listingStatuses].join(",")} /> : null}
+              {bookingStatuses.size > 0 ? <input type="hidden" name="bookingStatuses" value={[...bookingStatuses].join(",")} /> : null}
+              {verificationStatuses.size > 0 ? (
+                <input type="hidden" name="verificationStatuses" value={[...verificationStatuses].join(",")} />
+              ) : null}
               {bookingFilter !== "requested" ? <input type="hidden" name="bookingFilter" value={bookingFilter} /> : null}
               <input
                 type="search"
@@ -727,6 +826,48 @@ export default async function AdminPage({
               >
                 Apply
               </button>
+            </form>
+
+            <form method="get" className="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
+              {listingFilter !== "all" ? <input type="hidden" name="listingFilter" value={listingFilter} /> : null}
+              {bookingFilter !== "requested" ? <input type="hidden" name="bookingFilter" value={bookingFilter} /> : null}
+              {verificationFilter !== "pending" ? <input type="hidden" name="verificationFilter" value={verificationFilter} /> : null}
+              {filters.listingSearch ? <input type="hidden" name="listingSearch" value={filters.listingSearch} /> : null}
+              {filters.bookingSearch ? <input type="hidden" name="bookingSearch" value={filters.bookingSearch} /> : null}
+              {filters.verificationSearch ? <input type="hidden" name="verificationSearch" value={filters.verificationSearch} /> : null}
+              {listingSort !== "age" ? <input type="hidden" name="listingSort" value={listingSort} /> : null}
+              {bookingSort !== "age" ? <input type="hidden" name="bookingSort" value={bookingSort} /> : null}
+              {verificationSort !== "age" ? <input type="hidden" name="verificationSort" value={verificationSort} /> : null}
+              {listingAge !== "all" ? <input type="hidden" name="listingAge" value={listingAge} /> : null}
+              {bookingAge !== "all" ? <input type="hidden" name="bookingAge" value={bookingAge} /> : null}
+              {verificationAge !== "all" ? <input type="hidden" name="verificationAge" value={verificationAge} /> : null}
+              {bookingWindow !== "all" ? <input type="hidden" name="bookingWindow" value={bookingWindow} /> : null}
+              {bookingPayment !== "all" ? <input type="hidden" name="bookingPayment" value={bookingPayment} /> : null}
+              {listingStatuses.size > 0 ? <input type="hidden" name="listingStatuses" value={[...listingStatuses].join(",")} /> : null}
+              {verificationStatuses.size > 0 ? <input type="hidden" name="verificationStatuses" value={[...verificationStatuses].join(",")} /> : null}
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Editable status filter</p>
+              <div className="flex flex-wrap gap-3">
+                {bookingStatusOptions.map((status) => (
+                  <label key={status} className="flex items-center gap-2 text-sm text-slate-200">
+                    <input
+                      type="checkbox"
+                      name="bookingStatuses"
+                      value={status}
+                      defaultChecked={bookingStatuses.has(status)}
+                      className="h-4 w-4 rounded border-slate-600 bg-slate-950 text-orange-500 focus:ring-orange-400"
+                    />
+                    {status.replaceAll("_", " ")}
+                  </label>
+                ))}
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button type="submit" className="rounded-full border border-slate-700 px-3 py-1.5 text-xs text-slate-200 transition hover:border-slate-500">
+                  Apply statuses
+                </button>
+                <Link href={buildAdminHref(filters, { bookingStatuses: null })} className="rounded-full border border-slate-700 px-3 py-1.5 text-xs text-slate-300 transition hover:border-slate-500">
+                  Clear
+                </Link>
+              </div>
             </form>
           </div>
 
@@ -818,6 +959,11 @@ export default async function AdminPage({
               {verificationAge !== "all" ? <input type="hidden" name="verificationAge" value={verificationAge} /> : null}
               {bookingWindow !== "all" ? <input type="hidden" name="bookingWindow" value={bookingWindow} /> : null}
               {bookingPayment !== "all" ? <input type="hidden" name="bookingPayment" value={bookingPayment} /> : null}
+              {listingStatuses.size > 0 ? <input type="hidden" name="listingStatuses" value={[...listingStatuses].join(",")} /> : null}
+              {bookingStatuses.size > 0 ? <input type="hidden" name="bookingStatuses" value={[...bookingStatuses].join(",")} /> : null}
+              {verificationStatuses.size > 0 ? (
+                <input type="hidden" name="verificationStatuses" value={[...verificationStatuses].join(",")} />
+              ) : null}
               {verificationFilter !== "pending" ? (
                 <input type="hidden" name="verificationFilter" value={verificationFilter} />
               ) : null}
@@ -845,6 +991,48 @@ export default async function AdminPage({
               >
                 Apply
               </button>
+            </form>
+
+            <form method="get" className="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
+              {listingFilter !== "all" ? <input type="hidden" name="listingFilter" value={listingFilter} /> : null}
+              {bookingFilter !== "requested" ? <input type="hidden" name="bookingFilter" value={bookingFilter} /> : null}
+              {verificationFilter !== "pending" ? <input type="hidden" name="verificationFilter" value={verificationFilter} /> : null}
+              {filters.listingSearch ? <input type="hidden" name="listingSearch" value={filters.listingSearch} /> : null}
+              {filters.bookingSearch ? <input type="hidden" name="bookingSearch" value={filters.bookingSearch} /> : null}
+              {filters.verificationSearch ? <input type="hidden" name="verificationSearch" value={filters.verificationSearch} /> : null}
+              {listingSort !== "age" ? <input type="hidden" name="listingSort" value={listingSort} /> : null}
+              {bookingSort !== "age" ? <input type="hidden" name="bookingSort" value={bookingSort} /> : null}
+              {verificationSort !== "age" ? <input type="hidden" name="verificationSort" value={verificationSort} /> : null}
+              {listingAge !== "all" ? <input type="hidden" name="listingAge" value={listingAge} /> : null}
+              {bookingAge !== "all" ? <input type="hidden" name="bookingAge" value={bookingAge} /> : null}
+              {verificationAge !== "all" ? <input type="hidden" name="verificationAge" value={verificationAge} /> : null}
+              {bookingWindow !== "all" ? <input type="hidden" name="bookingWindow" value={bookingWindow} /> : null}
+              {bookingPayment !== "all" ? <input type="hidden" name="bookingPayment" value={bookingPayment} /> : null}
+              {listingStatuses.size > 0 ? <input type="hidden" name="listingStatuses" value={[...listingStatuses].join(",")} /> : null}
+              {bookingStatuses.size > 0 ? <input type="hidden" name="bookingStatuses" value={[...bookingStatuses].join(",")} /> : null}
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Editable status filter</p>
+              <div className="flex flex-wrap gap-3">
+                {verificationStatusOptions.map((status) => (
+                  <label key={status} className="flex items-center gap-2 text-sm text-slate-200">
+                    <input
+                      type="checkbox"
+                      name="verificationStatuses"
+                      value={status}
+                      defaultChecked={verificationStatuses.has(status)}
+                      className="h-4 w-4 rounded border-slate-600 bg-slate-950 text-orange-500 focus:ring-orange-400"
+                    />
+                    {status.replaceAll("_", " ")}
+                  </label>
+                ))}
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button type="submit" className="rounded-full border border-slate-700 px-3 py-1.5 text-xs text-slate-200 transition hover:border-slate-500">
+                  Apply statuses
+                </button>
+                <Link href={buildAdminHref(filters, { verificationStatuses: null })} className="rounded-full border border-slate-700 px-3 py-1.5 text-xs text-slate-300 transition hover:border-slate-500">
+                  Clear
+                </Link>
+              </div>
             </form>
           </div>
 
