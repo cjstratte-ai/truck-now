@@ -183,10 +183,19 @@ export default async function OperatorBookingDetailPage({
                     </button>
                   </form>
 
-                  <form action={updateBookingStatus}>
+                  <form action={updateBookingStatus} className="flex w-full flex-col gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4 sm:w-auto">
                     <input type="hidden" name="bookingId" value={data.booking.id} />
                     <input type="hidden" name="nextStatus" value="REJECTED" />
                     <input type="hidden" name="returnTo" value={`/operator/bookings/${data.booking.id}`} />
+                    <label className="text-xs uppercase tracking-wide text-slate-500">
+                      Decision note
+                      <textarea
+                        name="statusNote"
+                        rows={3}
+                        placeholder="Optional context for why the request was rejected. This will show in the booking timeline."
+                        className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-rose-400"
+                      />
+                    </label>
                     <button
                       type="submit"
                       className="rounded-lg bg-rose-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-rose-400"

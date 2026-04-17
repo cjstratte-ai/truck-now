@@ -660,6 +660,7 @@ export async function updateBookingStatus(formData: FormData) {
 
   const bookingId = getString(formData, "bookingId");
   const nextStatus = getString(formData, "nextStatus") as "APPROVED" | "REJECTED" | "PAID";
+  const statusNote = getString(formData, "statusNote");
   const paymentReference = getPaymentReference(formData, bookingId);
   const returnTo = getString(formData, "returnTo") || `/operator/bookings/${bookingId}`;
 
@@ -758,10 +759,10 @@ export async function updateBookingStatus(formData: FormData) {
         title: nextStatus === "APPROVED" ? "Booking approved" : nextStatus === "REJECTED" ? "Booking rejected" : "Payment captured",
         detail:
           nextStatus === "APPROVED"
-            ? `${session.name} approved the booking and moved it into payment capture.`
+            ? `${session.name} approved the booking and moved it into payment capture.${statusNote ? ` Note: ${statusNote}` : ""}`
             : nextStatus === "REJECTED"
-              ? `${session.name} rejected the booking and stopped it from moving forward.`
-              : `${session.name} captured payment with reference ${paymentReference}.`,
+              ? `${session.name} rejected the booking and stopped it from moving forward.${statusNote ? ` Note: ${statusNote}` : ""}`
+              : `${session.name} captured payment with reference ${paymentReference}.${statusNote ? ` Note: ${statusNote}` : ""}`,
         actorRole: session.role,
         actorName: session.name,
         occurredAt: now,
@@ -797,6 +798,7 @@ export async function updateVerificationStatus(formData: FormData) {
 
   const bookingId = getString(formData, "bookingId");
   const nextStatus = getString(formData, "nextStatus") as "APPROVED" | "REJECTED";
+  const verificationNote = getString(formData, "verificationNote");
   const returnTo = getString(formData, "returnTo") || `/admin/bookings/${bookingId}`;
 
   if (!bookingId || !["APPROVED", "REJECTED"].includes(nextStatus)) {
@@ -856,8 +858,8 @@ export async function updateVerificationStatus(formData: FormData) {
         title: nextStatus === "APPROVED" ? "Verification approved" : "Verification rejected",
         detail:
           nextStatus === "APPROVED"
-            ? `${session.name} cleared verification so the booking can keep moving.`
-            : `${session.name} rejected verification and blocked the booking from continuing.`,
+            ? `${session.name} cleared verification so the booking can keep moving.${verificationNote ? ` Note: ${verificationNote}` : ""}`
+            : `${session.name} rejected verification and blocked the booking from continuing.${verificationNote ? ` Note: ${verificationNote}` : ""}`,
         actorRole: session.role,
         actorName: session.name,
         occurredAt: now,
