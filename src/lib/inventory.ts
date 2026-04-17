@@ -173,9 +173,8 @@ export type AdminDashboardData = {
     requestedBookings: number;
     verificationPending: number;
   };
-  listingReviewQueue: AdminListingReview[];
-  bookingReviewQueue: AdminBookingReview[];
-  verificationQueue: AdminBookingReview[];
+  listings: AdminListingReview[];
+  bookings: AdminBookingReview[];
 };
 
 export type AdminListingReviewDetail = {
@@ -1212,6 +1211,21 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
   const activeListings = listings.filter((listing) => listing.status === "ACTIVE");
   const requestedBookings = bookings.filter((booking) => booking.status === "REQUESTED");
   const verificationPending = bookings.filter((booking) => booking.verificationStatus === "PENDING");
+  const listingPriority: Record<string, number> = {
+    PENDING_APPROVAL: 0,
+    REJECTED: 1,
+    ACTIVE: 2,
+    DRAFT: 3,
+    ARCHIVED: 4,
+  };
+  const bookingPriority: Record<string, number> = {
+    REQUESTED: 0,
+    APPROVED: 1,
+    PAID: 2,
+    REJECTED: 3,
+    CANCELLED: 4,
+    COMPLETED: 5,
+  };
 
   return {
     sourceLabel: getSourceLabel(source, "admin queue"),
@@ -1221,9 +1235,14 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
       requestedBookings: requestedBookings.length,
       verificationPending: verificationPending.length,
     },
-    listingReviewQueue: pendingListings.slice(0, 6).map(mapAdminListingReview),
-    bookingReviewQueue: requestedBookings.slice(0, 6).map(mapAdminBookingReview),
-    verificationQueue: verificationPending.slice(0, 6).map(mapAdminBookingReview),
+    listings: [...listings]
+      .sort((a, b) => (listingPriority[a.status] ?? 99) - (listingPriority[b.status] ?? 99))
+      .slice(0, 12)
+      .map(mapAdminListingReview),
+    bookings: [...bookings]
+      .sort((a, b) => (bookingPriority[a.status] ?? 99) - (bookingPriority[b.status] ?? 99))
+      .slice(0, 12)
+      .map(mapAdminBookingReview),
   };
 }
 

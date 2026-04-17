@@ -31,9 +31,108 @@ function getStatusClasses(status: string) {
   }
 }
 
-export default async function OperatorPage() {
+function buildFilterHref(
+  current: { listingFilter?: string; bookingFilter?: string },
+  key: "listingFilter" | "bookingFilter",
+  value: string,
+) {
+  const params = new URLSearchParams();
+
+  const nextListingFilter = key === "listingFilter" ? value : current.listingFilter;
+  const nextBookingFilter = key === "bookingFilter" ? value : current.bookingFilter;
+
+  if (nextListingFilter && nextListingFilter !== "all") {
+    params.set("listingFilter", nextListingFilter);
+  }
+
+  if (nextBookingFilter && nextBookingFilter !== "all") {
+    params.set("bookingFilter", nextBookingFilter);
+  }
+
+  const query = params.toString();
+  return query ? `/operator?${query}` : "/operator";
+}
+
+export default async function OperatorPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ listingFilter?: string; bookingFilter?: string }>;
+}) {
   const session = await requireRole(["OPERATOR", "ADMIN"], "/operator");
+  const filters = await searchParams;
   const data = await getOperatorDashboardData(session.role === "OPERATOR" ? session.email : undefined);
+
+  const listingFilter = filters.listingFilter ?? "all";
+  const bookingFilter = filters.bookingFilter ?? "all";
+
+  const filteredListings = data.listings.filter((listing) => {
+    switch (listingFilter) {
+      case "active":
+        return listing.status === "ACTIVE";
+      case "approval":
+        return listing.status === "PENDING_APPROVAL";
+      case "draft":
+        return listing.status === "DRAFT";
+      case "rejected":
+        return listing.status === "REJECTED";
+      case "archived":
+        return listing.status === "ARCHIVED";
+      default:
+        return true;
+    }
+  });
+
+  const filteredBookings = data.bookings.filter((booking) => {
+    switch (bookingFilter) {
+      case "attention":
+        return (
+          booking.status === "REQUESTED" ||
+          booking.status === "REJECTED" ||
+          booking.verificationStatus === "PENDING" ||
+          booking.verificationStatus === "REJECTED"
+        );
+      case "requested":
+        return booking.status === "REQUESTED";
+      case "approved":
+        return booking.status === "APPROVED";
+      case "paid":
+        return booking.status === "PAID";
+      case "rejected":
+        return booking.status === "REJECTED";
+      default:
+        return true;
+    }
+  });
+
+  const listingFilters = [
+    { key: "all", label: "All", count: data.listings.length },
+    { key: "active", label: "Active", count: data.listings.filter((listing) => listing.status === "ACTIVE").length },
+    {
+      key: "approval",
+      label: "Pending approval",
+      count: data.listings.filter((listing) => listing.status === "PENDING_APPROVAL").length,
+    },
+    { key: "draft", label: "Drafts", count: data.listings.filter((listing) => listing.status === "DRAFT").length },
+    { key: "rejected", label: "Rejected", count: data.listings.filter((listing) => listing.status === "REJECTED").length },
+  ];
+
+  const bookingFilters = [
+    { key: "all", label: "All", count: data.bookings.length },
+    {
+      key: "attention",
+      label: "Needs attention",
+      count: data.bookings.filter(
+        (booking) =>
+          booking.status === "REQUESTED" ||
+          booking.status === "REJECTED" ||
+          booking.verificationStatus === "PENDING" ||
+          booking.verificationStatus === "REJECTED",
+      ).length,
+    },
+    { key: "requested", label: "Requested", count: data.bookings.filter((booking) => booking.status === "REQUESTED").length },
+    { key: "approved", label: "Approved", count: data.bookings.filter((booking) => booking.status === "APPROVED").length },
+    { key: "paid", label: "Paid", count: data.bookings.filter((booking) => booking.status === "PAID").length },
+  ];
 
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-6 py-16 text-white">
@@ -88,18 +187,38 @@ export default async function OperatorPage() {
 
       <div className="mt-8 grid gap-6 xl:grid-cols-[1.3fr_1fr]">
         <section id="operator-listings" className="rounded-2xl border border-slate-800 bg-slate-900 p-6 scroll-mt-24">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Listings</h2>
-            <span className="text-sm text-slate-400">{data.listings.length} total</span>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">Listings</h2>
+              <span className="text-sm text-slate-400">{filteredListings.length} shown</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {listingFilters.map((filter) => {
+                const isActive = listingFilter === filter.key;
+                return (
+                  <Link
+                    key={filter.key}
+                    href={buildFilterHref(filters, "listingFilter", filter.key)}
+                    className={`rounded-full border px-3 py-1.5 text-xs transition ${
+                      isActive
+                        ? "border-orange-400 bg-orange-500/15 text-orange-200"
+                        : "border-slate-700 text-slate-300 hover:border-slate-500"
+                    }`}
+                  >
+                    {filter.label} · {filter.count}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
 
           <div className="mt-4 space-y-3">
-            {data.listings.length === 0 ? (
+            {filteredListings.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/40 p-6 text-sm text-slate-300">
-                No listings yet in this operator scope. Create one to start the workflow.
+                No listings match this filter yet.
               </div>
             ) : (
-              data.listings.map((listing) => (
+              filteredListings.map((listing) => (
                 <div
                   key={listing.id}
                   className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-950/60 p-4"
@@ -141,49 +260,75 @@ export default async function OperatorPage() {
         </section>
 
         <section id="operator-bookings" className="rounded-2xl border border-slate-800 bg-slate-900 p-6 scroll-mt-24">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Recent bookings</h2>
-            <span className="text-sm text-slate-400">{data.bookings.length} shown</span>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">Recent bookings</h2>
+              <span className="text-sm text-slate-400">{filteredBookings.length} shown</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {bookingFilters.map((filter) => {
+                const isActive = bookingFilter === filter.key;
+                return (
+                  <Link
+                    key={filter.key}
+                    href={buildFilterHref(filters, "bookingFilter", filter.key)}
+                    className={`rounded-full border px-3 py-1.5 text-xs transition ${
+                      isActive
+                        ? "border-orange-400 bg-orange-500/15 text-orange-200"
+                        : "border-slate-700 text-slate-300 hover:border-slate-500"
+                    }`}
+                  >
+                    {filter.label} · {filter.count}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
 
           <div className="mt-4 space-y-3">
-            {data.bookings.map((booking) => (
-              <div key={booking.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="font-semibold">{booking.listingTitle}</h3>
-                  <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(booking.status)}`}>
-                    {booking.status.replaceAll("_", " ")}
-                  </span>
-                </div>
-                <p className="mt-2 text-sm text-slate-400">
-                  {booking.customerName} in {booking.city}
-                </p>
-                <p className="mt-1 text-sm text-slate-400">
-                  {formatDate(booking.startDate)} to {formatDate(booking.endDate)}
-                </p>
-                <div className="mt-3 flex items-center justify-between text-sm">
-                  <span className="text-slate-400">
-                    Verification: <span className="text-slate-200">{booking.verificationStatus.replaceAll("_", " ")}</span>
-                  </span>
-                  <span className="font-medium text-slate-200">{formatCurrency(booking.totalAmount)}</span>
-                </div>
-
-                <div className="mt-4 flex flex-wrap gap-3">
-                  <Link
-                    href={`/operator/bookings/${booking.id}`}
-                    className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
-                  >
-                    Review booking
-                  </Link>
-                  <Link
-                    href={`/operator/listings/${booking.listingId}`}
-                    className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500"
-                  >
-                    Open listing
-                  </Link>
-                </div>
+            {filteredBookings.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/40 p-6 text-sm text-slate-300">
+                No bookings match this filter right now.
               </div>
-            ))}
+            ) : (
+              filteredBookings.map((booking) => (
+                <div key={booking.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="font-semibold">{booking.listingTitle}</h3>
+                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(booking.status)}`}>
+                      {booking.status.replaceAll("_", " ")}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm text-slate-400">
+                    {booking.customerName} in {booking.city}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-400">
+                    {formatDate(booking.startDate)} to {formatDate(booking.endDate)}
+                  </p>
+                  <div className="mt-3 flex items-center justify-between text-sm">
+                    <span className="text-slate-400">
+                      Verification: <span className="text-slate-200">{booking.verificationStatus.replaceAll("_", " ")}</span>
+                    </span>
+                    <span className="font-medium text-slate-200">{formatCurrency(booking.totalAmount)}</span>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <Link
+                      href={`/operator/bookings/${booking.id}`}
+                      className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
+                    >
+                      Review booking
+                    </Link>
+                    <Link
+                      href={`/operator/listings/${booking.listingId}`}
+                      className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500"
+                    >
+                      Open listing
+                    </Link>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </section>
       </div>
