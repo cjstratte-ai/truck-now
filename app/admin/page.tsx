@@ -6,6 +6,9 @@ import { requireRole } from "@/src/lib/auth";
 import { getAdminDashboardData } from "@/src/lib/inventory";
 
 type AdminFilters = {
+  message?: string;
+  updated?: string;
+  skipped?: string;
   listingFilter?: string;
   bookingFilter?: string;
   verificationFilter?: string;
@@ -86,6 +89,76 @@ function parseSelectedStatuses(value?: string | string[] | null) {
   const raw = Array.isArray(value) ? value : [value];
 
   return [...new Set(raw.flatMap((item) => item.split(",")).map((item) => item.trim()).filter(Boolean))];
+}
+
+function parseCount(value?: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getBulkMessageMeta(message?: string) {
+  switch (message) {
+    case "bulk-listing-approved":
+      return {
+        tone: "success" as const,
+        title: "Listings approved",
+        detail: "The selected pending listings were moved forward.",
+      };
+    case "bulk-listing-rejected":
+      return {
+        tone: "success" as const,
+        title: "Listings rejected",
+        detail: "The selected pending listings were rejected.",
+      };
+    case "bulk-booking-approved":
+      return {
+        tone: "success" as const,
+        title: "Bookings approved",
+        detail: "Eligible booking requests were moved into payment capture.",
+      };
+    case "bulk-booking-rejected":
+      return {
+        tone: "success" as const,
+        title: "Bookings rejected",
+        detail: "Selected booking requests were rejected.",
+      };
+    case "bulk-verification-approved":
+      return {
+        tone: "success" as const,
+        title: "Verification cleared",
+        detail: "Selected verification items were approved.",
+      };
+    case "bulk-verification-rejected":
+      return {
+        tone: "success" as const,
+        title: "Verification rejected",
+        detail: "Selected verification items were rejected.",
+      };
+    case "bulk-listing-review-failed":
+      return {
+        tone: "error" as const,
+        title: "Bulk listing action failed",
+        detail: "Nothing changed. Try selecting pending items and submit again.",
+      };
+    case "bulk-booking-status-failed":
+      return {
+        tone: "error" as const,
+        title: "Bulk booking action failed",
+        detail: "Nothing changed. Some selected bookings may no longer be eligible.",
+      };
+    case "bulk-verification-status-failed":
+      return {
+        tone: "error" as const,
+        title: "Bulk verification action failed",
+        detail: "Nothing changed. Some selected items may already be resolved.",
+      };
+    default:
+      return null;
+  }
 }
 
 function getAgeMeta(value?: string | null, staleAfterDays = 3) {
@@ -233,6 +306,9 @@ export default async function AdminPage({
   const verificationAge = filters.verificationAge ?? "all";
   const bookingWindow = filters.bookingWindow ?? "all";
   const bookingPayment = filters.bookingPayment ?? "all";
+  const bulkMessage = getBulkMessageMeta(filters.message);
+  const updatedCount = parseCount(filters.updated);
+  const skippedCount = parseCount(filters.skipped);
   const todayKey = getLocalDayKey(new Date().toISOString());
   const currentAdminHref = buildAdminHref(filters, {});
   const listingStatuses = new Set(parseSelectedStatuses(filters.listingStatuses));
@@ -576,6 +652,26 @@ export default async function AdminPage({
           </Link>
         ))}
       </div>
+
+      {bulkMessage ? (
+        <div
+          className={`mb-8 rounded-2xl border px-4 py-4 text-sm ${
+            bulkMessage.tone === "success"
+              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-100"
+              : "border-rose-500/30 bg-rose-500/10 text-rose-100"
+          }`}
+        >
+          <p className="font-medium">{bulkMessage.title}</p>
+          <p className="mt-1 text-sm/6 opacity-90">{bulkMessage.detail}</p>
+          {bulkMessage.tone === "success" && (updatedCount !== null || skippedCount !== null) ? (
+            <p className="mt-2 text-xs uppercase tracking-wide opacity-80">
+              {updatedCount !== null ? `Updated ${updatedCount}` : null}
+              {updatedCount !== null && skippedCount !== null ? " • " : null}
+              {skippedCount !== null ? `Skipped ${skippedCount}` : null}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">

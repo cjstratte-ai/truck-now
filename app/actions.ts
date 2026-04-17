@@ -54,6 +54,21 @@ function getRedirectUrl(path: string, message: string) {
   return `${url.pathname}${url.search}`;
 }
 
+function getRedirectUrlWithParams(path: string, message: string, params: Record<string, string | number | null | undefined>) {
+  const url = new URL(path, "http://localhost");
+  url.searchParams.set("message", message);
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value === null || value === undefined || value === "") {
+      continue;
+    }
+
+    url.searchParams.set(key, String(value));
+  }
+
+  return `${url.pathname}${url.search}`;
+}
+
 function getMoneyAmount(formData: FormData, key: string) {
   const value = getString(formData, key);
 
@@ -480,7 +495,12 @@ export async function bulkReviewListings(formData: FormData) {
       revalidateWorkflowPaths(listing.id);
     }
 
-    redirect(getRedirectUrl(returnTo, nextStatus === "ACTIVE" ? "bulk-listing-approved" : "bulk-listing-rejected"));
+    redirect(
+      getRedirectUrlWithParams(returnTo, nextStatus === "ACTIVE" ? "bulk-listing-approved" : "bulk-listing-rejected", {
+        updated: eligibleListings.length,
+        skipped: Math.max(0, listingIds.length - eligibleListings.length),
+      }),
+    );
   } catch {
     redirect(getRedirectUrl(returnTo, "bulk-listing-review-failed"));
   }
@@ -967,7 +987,12 @@ export async function bulkUpdateBookingStatuses(formData: FormData) {
       revalidateWorkflowPaths(booking.listingId, booking.id);
     }
 
-    redirect(getRedirectUrl(returnTo, nextStatus === "APPROVED" ? "bulk-booking-approved" : "bulk-booking-rejected"));
+    redirect(
+      getRedirectUrlWithParams(returnTo, nextStatus === "APPROVED" ? "bulk-booking-approved" : "bulk-booking-rejected", {
+        updated: eligibleBookings.length,
+        skipped: Math.max(0, bookingIds.length - eligibleBookings.length),
+      }),
+    );
   } catch {
     redirect(getRedirectUrl(returnTo, "bulk-booking-status-failed"));
   }
@@ -1156,7 +1181,12 @@ export async function bulkUpdateVerificationStatuses(formData: FormData) {
       revalidateWorkflowPaths(booking.listingId, booking.id);
     }
 
-    redirect(getRedirectUrl(returnTo, nextStatus === "APPROVED" ? "bulk-verification-approved" : "bulk-verification-rejected"));
+    redirect(
+      getRedirectUrlWithParams(returnTo, nextStatus === "APPROVED" ? "bulk-verification-approved" : "bulk-verification-rejected", {
+        updated: currentBookings.length,
+        skipped: Math.max(0, bookingIds.length - currentBookings.length),
+      }),
+    );
   } catch {
     redirect(getRedirectUrl(returnTo, "bulk-verification-status-failed"));
   }
