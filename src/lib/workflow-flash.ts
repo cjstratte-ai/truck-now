@@ -118,7 +118,7 @@ const flashMessages: Record<string, FlashNotice> = {
   },
   "booking-approved": {
     tone: "success",
-    text: "Booking approved. Customer payment and next-step notifications are now ready.",
+    text: "Booking approved. Payment is now waiting for capture, and fresh notifications are queued.",
   },
   "booking-approved-demo": {
     tone: "success",
@@ -126,7 +126,7 @@ const flashMessages: Record<string, FlashNotice> = {
   },
   "booking-rejected": {
     tone: "success",
-    text: "Booking rejected and the customer-facing update is ready.",
+    text: "Booking rejected. Payment is blocked, and the workflow updates are queued.",
   },
   "booking-rejected-demo": {
     tone: "success",
@@ -134,7 +134,7 @@ const flashMessages: Record<string, FlashNotice> = {
   },
   "booking-paid": {
     tone: "success",
-    text: "Booking marked paid. The handoff notification is now ready.",
+    text: "Payment captured and stored on the booking. Handoff notifications are now queued.",
   },
   "booking-paid-demo": {
     tone: "success",
@@ -154,7 +154,7 @@ const flashMessages: Record<string, FlashNotice> = {
   },
   "verification-rejected": {
     tone: "success",
-    text: "Verification rejected.",
+    text: "Verification rejected. The booking is blocked from payment and the workflow updates are queued.",
   },
   "verification-rejected-demo": {
     tone: "success",
@@ -163,6 +163,26 @@ const flashMessages: Record<string, FlashNotice> = {
   "verification-status-failed": {
     tone: "error",
     text: "The verification action failed. Please try again.",
+  },
+  "customer-notification-sent": {
+    tone: "success",
+    text: "Customer workflow update marked sent.",
+  },
+  "customer-notification-sent-demo": {
+    tone: "success",
+    text: "Customer notification ran in demo mode. Connect a database to persist it.",
+  },
+  "ops-notification-sent": {
+    tone: "success",
+    text: "Ops workflow update marked sent.",
+  },
+  "ops-notification-sent-demo": {
+    tone: "success",
+    text: "Ops notification ran in demo mode. Connect a database to persist it.",
+  },
+  "notification-send-failed": {
+    tone: "error",
+    text: "The workflow notification action failed. Please try again.",
   },
 };
 

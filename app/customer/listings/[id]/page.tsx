@@ -108,7 +108,29 @@ export default async function CustomerListingDetailPage({
         </section>
 
         <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-          <h2 className="text-xl font-semibold">Request this truck</h2>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-semibold">Request this truck</h2>
+              <p className="mt-2 text-sm text-slate-400">
+                Submit the request here, then use the customer dashboard to track the booking once it is in flight.
+              </p>
+            </div>
+            {session?.role === "CUSTOMER" ? (
+              <Link
+                href="/customer"
+                className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500"
+              >
+                Back to dashboard
+              </Link>
+            ) : (
+              <Link
+                href={`/login?next=${encodeURIComponent(`/customer/listings/${data.listing.id}`)}`}
+                className="rounded-lg border border-orange-400/50 px-4 py-2 text-sm font-medium text-orange-200 transition hover:border-orange-300"
+              >
+                Sign in to track this booking
+              </Link>
+            )}
+          </div>
           <BookingRequestForm
             listingId={data.listing.id}
             dailyRate={data.listing.dailyRate}

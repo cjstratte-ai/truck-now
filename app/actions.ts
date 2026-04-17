@@ -3,8 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { clearSession, createSession, normalizeNextPath, requireRole } from "@/src/lib/auth";
-import { getRentalDays } from "@/src/lib/booking-workflow";
+import { clearSession, createSession, getCurrentSession, normalizeNextPath, requireRole } from "@/src/lib/auth";
+import {
+  getCustomerNotificationKind,
+  getNotificationFlowForBookingStatus,
+  getNotificationFlowForNewRequest,
+  getNotificationFlowForVerificationStatus,
+  getOpsNotificationKind,
+  getRentalDays,
+} from "@/src/lib/booking-workflow";
 
 async function loadPrismaClient() {
   if (!process.env.DATABASE_URL) {
@@ -97,6 +104,100 @@ function getCheckbox(formData: FormData, key: string) {
   return formData.get(key) === "on";
 }
 
+function getPaymentReference(formData: FormData, bookingId: string) {
+  const value = getString(formData, "paymentReference");
+
+  if (value) {
+    return value;
+  }
+
+  return `manual-${bookingId.slice(-6)}`;
+}
+
+async function findAuthorizedBooking(
+  prisma: NonNullable<Awaited<ReturnType<typeof loadPrismaClient>>>,
+  bookingId: string,
+  session: Awaited<ReturnType<typeof requireRole>>,
+) {
+  return prisma.booking.findFirst({
+    where: {
+      id: bookingId,
+      ...(session.role === "OPERATOR"
+        ? {
+            listing: {
+              owner: {
+                email: session.email,
+              },
+            },
+          }
+        : {}),
+    },
+    select: {
+      id: true,
+      listingId: true,
+      status: true,
+      verificationStatus: true,
+      paymentStatus: true,
+      customerNotificationKind: true,
+      opsNotificationKind: true,
+    },
+  });
+}
+
+async function logBookingTimelineEvent(
+  prisma: NonNullable<Awaited<ReturnType<typeof loadPrismaClient>>>,
+  bookingId: string,
+  event: {
+    eventType: string;
+    title: string;
+    detail: string;
+    actorRole?: string;
+    actorName?: string;
+    occurredAt?: Date;
+  },
+) {
+  await prisma.bookingTimelineEvent.create({
+    data: {
+      bookingId,
+      eventType: event.eventType,
+      title: event.title,
+      detail: event.detail,
+      actorRole: event.actorRole,
+      actorName: event.actorName,
+      occurredAt: event.occurredAt,
+    },
+  });
+}
+
+async function logBookingTimelineEvents(
+  prisma: NonNullable<Awaited<ReturnType<typeof loadPrismaClient>>>,
+  bookingId: string,
+  events: Array<{
+    eventType: string;
+    title: string;
+    detail: string;
+    actorRole?: string;
+    actorName?: string;
+    occurredAt?: Date;
+  }>,
+) {
+  if (events.length === 0) {
+    return;
+  }
+
+  await prisma.bookingTimelineEvent.createMany({
+    data: events.map((event) => ({
+      bookingId,
+      eventType: event.eventType,
+      title: event.title,
+      detail: event.detail,
+      actorRole: event.actorRole,
+      actorName: event.actorName,
+      occurredAt: event.occurredAt,
+    })),
+  });
+}
+
 function revalidateWorkflowPaths(listingId?: string, bookingId?: string) {
   revalidatePath("/customer");
   revalidatePath("/operator");
@@ -111,6 +212,7 @@ function revalidateWorkflowPaths(listingId?: string, bookingId?: string) {
   if (bookingId) {
     revalidatePath(`/operator/bookings/${bookingId}`);
     revalidatePath(`/admin/bookings/${bookingId}`);
+    revalidatePath(`/customer/bookings/${bookingId}`);
   }
 }
 
@@ -149,6 +251,8 @@ export async function createBookingRequest(formData: FormData) {
   if (!listingId || !customerName || !customerEmail || !startDateValue || !endDateValue) {
     redirect(getRedirectUrl(returnTo, "booking-request-missing-fields"));
   }
+
+  const session = await getCurrentSession();
 
   const startDate = new Date(startDateValue);
   const endDate = new Date(endDateValue);
@@ -224,6 +328,8 @@ export async function createBookingRequest(formData: FormData) {
     const rentalDays = getRentalDays(startDateValue, endDateValue);
     const totalAmount = rentalDays * listing.dailyRate;
 
+    const now = new Date();
+
     const booking = await prisma.booking.create({
       data: {
         listingId: listing.id,
@@ -233,10 +339,44 @@ export async function createBookingRequest(formData: FormData) {
         totalAmount,
         status: "REQUESTED",
         verificationStatus: "PENDING",
+        paymentStatus: "NOT_READY",
+        ...getNotificationFlowForNewRequest(now),
       },
     });
 
+    await logBookingTimelineEvents(prisma, booking.id, [
+      {
+        eventType: "BOOKING_REQUESTED",
+        title: "Booking requested",
+        detail: `${customerName} requested this truck from ${startDateValue} to ${endDateValue}.`,
+        actorRole: "CUSTOMER",
+        actorName: customerName,
+        occurredAt: now,
+      },
+      {
+        eventType: "CUSTOMER_NOTIFICATION_SENT",
+        title: "Customer confirmation sent",
+        detail: `The booking confirmation was marked sent to ${customerEmail}.`,
+        actorRole: "SYSTEM",
+        actorName: "Workflow automation",
+        occurredAt: now,
+      },
+      {
+        eventType: "OPS_NOTIFICATION_QUEUED",
+        title: "Ops review queued",
+        detail: "The booking is waiting on operator review and the ops lane is pending an update.",
+        actorRole: "SYSTEM",
+        actorName: "Workflow automation",
+        occurredAt: now,
+      },
+    ]);
+
     revalidateWorkflowPaths(listing.id, booking.id);
+
+    if (session?.role === "CUSTOMER" && session.email.toLowerCase() === customerEmail) {
+      redirect(getRedirectUrl(`/customer/bookings/${booking.id}`, "booking-request-created"));
+    }
+
     redirect(getRedirectUrl(returnTo, "booking-request-created"));
   } catch {
     redirect(getRedirectUrl(returnTo, "booking-request-failed"));
@@ -247,7 +387,7 @@ export async function reviewListing(formData: FormData) {
   await requireRole(["ADMIN"], "/admin");
 
   const listingId = getString(formData, "listingId");
-  const nextStatus = getString(formData, "nextStatus");
+  const nextStatus = getString(formData, "nextStatus") as "ACTIVE" | "REJECTED";
   const returnTo = `/admin/listings/${listingId}`;
 
   if (!listingId || !["ACTIVE", "REJECTED"].includes(nextStatus)) {
@@ -282,7 +422,7 @@ export async function saveOperatorListing(formData: FormData) {
 
   const listingId = getString(formData, "listingId");
   const title = getString(formData, "title");
-  const vehicleType = getString(formData, "vehicleType");
+  const vehicleType = getString(formData, "vehicleType") as "PICKUP" | "BOX_TRUCK" | "CARGO_VAN" | "OTHER";
   const description = getString(formData, "description");
   const city = getString(formData, "city");
   const state = getString(formData, "state").toUpperCase();
@@ -369,7 +509,7 @@ export async function createOperatorListing(formData: FormData) {
   const session = await requireRole(["OPERATOR", "ADMIN"], "/operator/listings/new");
 
   const title = getString(formData, "title");
-  const vehicleType = getString(formData, "vehicleType");
+  const vehicleType = getString(formData, "vehicleType") as "PICKUP" | "BOX_TRUCK" | "CARGO_VAN" | "OTHER";
   const description = getString(formData, "description");
   const city = getString(formData, "city");
   const state = getString(formData, "state").toUpperCase();
@@ -465,7 +605,7 @@ export async function archiveOperatorListing(formData: FormData) {
   const session = await requireRole(["OPERATOR", "ADMIN"], "/operator");
 
   const listingId = getString(formData, "listingId");
-  const nextStatus = getString(formData, "nextStatus");
+  const nextStatus = getString(formData, "nextStatus") as "ARCHIVED" | "DRAFT";
   const returnTo = getString(formData, "returnTo") || `/operator/listings/${listingId}`;
 
   if (!listingId || !["ARCHIVED", "DRAFT"].includes(nextStatus)) {
@@ -519,7 +659,8 @@ export async function updateBookingStatus(formData: FormData) {
   const session = await requireRole(["OPERATOR", "ADMIN"], "/operator");
 
   const bookingId = getString(formData, "bookingId");
-  const nextStatus = getString(formData, "nextStatus");
+  const nextStatus = getString(formData, "nextStatus") as "APPROVED" | "REJECTED" | "PAID";
+  const paymentReference = getPaymentReference(formData, bookingId);
   const returnTo = getString(formData, "returnTo") || `/operator/bookings/${bookingId}`;
 
   if (!bookingId || !["APPROVED", "REJECTED", "PAID"].includes(nextStatus)) {
@@ -540,38 +681,105 @@ export async function updateBookingStatus(formData: FormData) {
   }
 
   try {
-    if (session.role === "OPERATOR") {
-      const authorizedBooking = await prisma.booking.findFirst({
-        where: {
-          id: bookingId,
-          listing: {
-            owner: {
-              email: session.email,
-            },
-          },
-        },
-        select: {
-          id: true,
-        },
-      });
+    const currentBooking = await findAuthorizedBooking(prisma, bookingId, session);
 
-      if (!authorizedBooking) {
+    if (!currentBooking) {
+      redirect(getRedirectUrl(returnTo, "booking-status-failed"));
+    }
+
+    const now = new Date();
+    let updateData:
+      | {
+          status: "APPROVED" | "REJECTED" | "PAID";
+          paymentStatus: "NOT_READY" | "PENDING_CAPTURE" | "CAPTURED";
+          paymentCapturedAt: Date | null;
+          paymentReference: string | null;
+          customerNotificationKind: string;
+          customerNotificationState: "PENDING";
+          customerNotificationSentAt: null;
+          opsNotificationKind: string;
+          opsNotificationState: "PENDING";
+          opsNotificationSentAt: null;
+        }
+      | undefined;
+
+    if (nextStatus === "APPROVED") {
+      if (currentBooking.status !== "REQUESTED" || currentBooking.verificationStatus === "REJECTED") {
         redirect(getRedirectUrl(returnTo, "booking-status-failed"));
       }
+
+      updateData = {
+        status: nextStatus,
+        paymentStatus: "PENDING_CAPTURE",
+        paymentCapturedAt: null,
+        paymentReference: null,
+        ...getNotificationFlowForBookingStatus(nextStatus),
+      };
+    } else if (nextStatus === "REJECTED") {
+      if (currentBooking.status === "PAID") {
+        redirect(getRedirectUrl(returnTo, "booking-status-failed"));
+      }
+
+      updateData = {
+        status: nextStatus,
+        paymentStatus: "NOT_READY",
+        paymentCapturedAt: null,
+        paymentReference: null,
+        ...getNotificationFlowForBookingStatus(nextStatus),
+      };
+    } else {
+      if (currentBooking.status !== "APPROVED" || currentBooking.paymentStatus !== "PENDING_CAPTURE") {
+        redirect(getRedirectUrl(returnTo, "booking-status-failed"));
+      }
+
+      updateData = {
+        status: nextStatus,
+        paymentStatus: "CAPTURED",
+        paymentCapturedAt: now,
+        paymentReference,
+        ...getNotificationFlowForBookingStatus(nextStatus),
+      };
     }
 
     const booking = await prisma.booking.update({
       where: {
         id: bookingId,
       },
-      data: {
-        status: nextStatus,
-      },
+      data: updateData,
       select: {
         id: true,
         listingId: true,
       },
     });
+
+    await logBookingTimelineEvents(prisma, booking.id, [
+      {
+        eventType: nextStatus === "APPROVED" ? "BOOKING_APPROVED" : nextStatus === "REJECTED" ? "BOOKING_REJECTED" : "PAYMENT_CAPTURED",
+        title: nextStatus === "APPROVED" ? "Booking approved" : nextStatus === "REJECTED" ? "Booking rejected" : "Payment captured",
+        detail:
+          nextStatus === "APPROVED"
+            ? `${session.name} approved the booking and moved it into payment capture.`
+            : nextStatus === "REJECTED"
+              ? `${session.name} rejected the booking and stopped it from moving forward.`
+              : `${session.name} captured payment with reference ${paymentReference}.`,
+        actorRole: session.role,
+        actorName: session.name,
+        occurredAt: now,
+      },
+      {
+        eventType: "WORKFLOW_NOTIFICATION_QUEUED",
+        title: "Workflow updates queued",
+        detail:
+          nextStatus === "APPROVED"
+            ? "Customer payment instructions and ops follow-up are pending send."
+            : nextStatus === "REJECTED"
+              ? "Customer and ops rejection updates are pending send."
+              : "Customer payment confirmation and ops handoff updates are pending send.",
+        actorRole: "SYSTEM",
+        actorName: "Workflow automation",
+        occurredAt: now,
+      },
+    ]);
 
     revalidateWorkflowPaths(booking.listingId, booking.id);
 
@@ -585,10 +793,10 @@ export async function updateBookingStatus(formData: FormData) {
 }
 
 export async function updateVerificationStatus(formData: FormData) {
-  await requireRole(["ADMIN"], "/admin");
+  const session = await requireRole(["ADMIN"], "/admin");
 
   const bookingId = getString(formData, "bookingId");
-  const nextStatus = getString(formData, "nextStatus");
+  const nextStatus = getString(formData, "nextStatus") as "APPROVED" | "REJECTED";
   const returnTo = getString(formData, "returnTo") || `/admin/bookings/${bookingId}`;
 
   if (!bookingId || !["APPROVED", "REJECTED"].includes(nextStatus)) {
@@ -602,22 +810,151 @@ export async function updateVerificationStatus(formData: FormData) {
   }
 
   try {
+    const currentBooking = await prisma.booking.findUnique({
+      where: {
+        id: bookingId,
+      },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+
+    if (!currentBooking) {
+      redirect(getRedirectUrl(returnTo, "verification-status-failed"));
+    }
+
+    const now = new Date();
+
     const booking = await prisma.booking.update({
       where: {
         id: bookingId,
       },
-      data: {
-        verificationStatus: nextStatus,
-      },
+      data:
+        nextStatus === "APPROVED"
+          ? {
+              verificationStatus: nextStatus,
+              ...getNotificationFlowForVerificationStatus(nextStatus),
+            }
+          : {
+              verificationStatus: nextStatus,
+              status: currentBooking.status === "PAID" ? currentBooking.status : "REJECTED",
+              paymentStatus: currentBooking.status === "PAID" ? undefined : "NOT_READY",
+              paymentCapturedAt: currentBooking.status === "PAID" ? undefined : null,
+              paymentReference: currentBooking.status === "PAID" ? undefined : null,
+              ...getNotificationFlowForVerificationStatus(nextStatus),
+            },
       select: {
         id: true,
         listingId: true,
       },
     });
 
+    await logBookingTimelineEvents(prisma, booking.id, [
+      {
+        eventType: nextStatus === "APPROVED" ? "VERIFICATION_APPROVED" : "VERIFICATION_REJECTED",
+        title: nextStatus === "APPROVED" ? "Verification approved" : "Verification rejected",
+        detail:
+          nextStatus === "APPROVED"
+            ? `${session.name} cleared verification so the booking can keep moving.`
+            : `${session.name} rejected verification and blocked the booking from continuing.`,
+        actorRole: session.role,
+        actorName: session.name,
+        occurredAt: now,
+      },
+      {
+        eventType: "WORKFLOW_NOTIFICATION_QUEUED",
+        title: "Workflow updates queued",
+        detail:
+          nextStatus === "APPROVED"
+            ? "Ops review is pending an updated workflow send."
+            : "Customer and ops verification-failure updates are pending send.",
+        actorRole: "SYSTEM",
+        actorName: "Workflow automation",
+        occurredAt: now,
+      },
+    ]);
+
     revalidateWorkflowPaths(booking.listingId, booking.id);
     redirect(getRedirectUrl(returnTo, nextStatus === "APPROVED" ? "verification-approved" : "verification-rejected"));
   } catch {
     redirect(getRedirectUrl(returnTo, "verification-status-failed"));
+  }
+}
+
+export async function sendBookingNotification(formData: FormData) {
+  const session = await requireRole(["OPERATOR", "ADMIN"], "/operator");
+
+  const bookingId = getString(formData, "bookingId");
+  const audience = getString(formData, "audience");
+  const returnTo = getString(formData, "returnTo") || `/operator/bookings/${bookingId}`;
+
+  if (!bookingId || !["customer", "ops"].includes(audience)) {
+    redirect(getRedirectUrl(returnTo, "notification-send-failed"));
+  }
+
+  const prisma = await loadPrismaClient();
+
+  if (!prisma) {
+    redirect(getRedirectUrl(returnTo, audience === "customer" ? "customer-notification-sent-demo" : "ops-notification-sent-demo"));
+  }
+
+  try {
+    const bookingRecord = await findAuthorizedBooking(prisma, bookingId, session);
+
+    if (!bookingRecord) {
+      redirect(getRedirectUrl(returnTo, "notification-send-failed"));
+    }
+
+    const now = new Date();
+    const customerKind = getCustomerNotificationKind(
+      bookingRecord.status,
+      bookingRecord.verificationStatus,
+      bookingRecord.customerNotificationKind,
+    );
+    const opsKind = getOpsNotificationKind(
+      bookingRecord.status,
+      bookingRecord.verificationStatus,
+      bookingRecord.opsNotificationKind,
+    );
+
+    const booking = await prisma.booking.update({
+      where: {
+        id: bookingId,
+      },
+      data:
+        audience === "customer"
+          ? {
+              customerNotificationKind: customerKind,
+              customerNotificationState: "SENT",
+              customerNotificationSentAt: now,
+            }
+          : {
+              opsNotificationKind: opsKind,
+              opsNotificationState: "SENT",
+              opsNotificationSentAt: now,
+            },
+      select: {
+        id: true,
+        listingId: true,
+      },
+    });
+
+    await logBookingTimelineEvent(prisma, booking.id, {
+      eventType: audience === "customer" ? "CUSTOMER_NOTIFICATION_SENT" : "OPS_NOTIFICATION_SENT",
+      title: audience === "customer" ? "Customer update sent" : "Ops update sent",
+      detail:
+        audience === "customer"
+          ? `${session.name} marked the ${customerKind.toLowerCase().replaceAll("_", " ")} update sent to the customer.`
+          : `${session.name} marked the ${opsKind.toLowerCase().replaceAll("_", " ")} update sent to operations.`,
+      actorRole: session.role,
+      actorName: session.name,
+      occurredAt: now,
+    });
+
+    revalidateWorkflowPaths(booking.listingId, booking.id);
+    redirect(getRedirectUrl(returnTo, audience === "customer" ? "customer-notification-sent" : "ops-notification-sent"));
+  } catch {
+    redirect(getRedirectUrl(returnTo, "notification-send-failed"));
   }
 }

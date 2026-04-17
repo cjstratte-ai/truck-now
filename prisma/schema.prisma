@@ -44,6 +44,17 @@ enum VerificationStatus {
   REJECTED
 }
 
+enum PaymentStatus {
+  NOT_READY
+  PENDING_CAPTURE
+  CAPTURED
+}
+
+enum NotificationState {
+  PENDING
+  SENT
+}
+
 model User {
   id          String    @id @default(cuid())
   email       String    @unique
@@ -85,8 +96,32 @@ model Booking {
   totalAmount        Int
   status             BookingStatus      @default(REQUESTED)
   verificationStatus VerificationStatus @default(NOT_STARTED)
+  paymentStatus      PaymentStatus      @default(NOT_READY)
+  paymentCapturedAt  DateTime?
+  paymentReference   String?
+  customerNotificationKind String?
+  customerNotificationState NotificationState @default(PENDING)
+  customerNotificationSentAt DateTime?
+  opsNotificationKind String?
+  opsNotificationState NotificationState @default(PENDING)
+  opsNotificationSentAt DateTime?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
   listing            Listing            @relation(fields: [listingId], references: [id], onDelete: Cascade)
   customer           User               @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  timelineEvents     BookingTimelineEvent[]
+}
+
+model BookingTimelineEvent {
+  id        String   @id @default(cuid())
+  bookingId String
+  eventType String
+  title     String
+  detail    String   @db.Text
+  actorRole String?
+  actorName String?
+  occurredAt DateTime @default(now())
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId, occurredAt])
 }

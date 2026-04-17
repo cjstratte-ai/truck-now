@@ -1,8 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { updateBookingStatus } from "@/app/actions";
-import { formatCurrency, getCustomerNotificationPreview, getOpsNotificationPreview, getPaymentSummary } from "@/src/lib/booking-workflow";
+import { sendBookingNotification, updateBookingStatus } from "@/app/actions";
+import {
+  formatCurrency,
+  getCustomerNotificationPreview,
+  getOpsNotificationPreview,
+  getPaymentSummary,
+} from "@/src/lib/booking-workflow";
 import { requireRole } from "@/src/lib/auth";
 import { getOperatorBookingDetail } from "@/src/lib/inventory";
 import { getFlashClasses, getWorkflowFlash } from "@/src/lib/workflow-flash";
@@ -14,13 +19,29 @@ function formatDate(value: string) {
   });
 }
 
+function formatDateTime(value: string | null) {
+  if (!value) {
+    return "Not sent yet";
+  }
+
+  return new Date(value).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 function getStatusClasses(status: string) {
   switch (status) {
     case "PAID":
     case "APPROVED":
+    case "CAPTURED":
+    case "SENT":
       return "bg-emerald-500/15 text-emerald-300";
     case "REQUESTED":
     case "PENDING":
+    case "PENDING_CAPTURE":
       return "bg-amber-500/15 text-amber-300";
     default:
       return "bg-slate-700 text-slate-300";
@@ -74,12 +95,17 @@ export default async function OperatorBookingDetailPage({
           <span className={`rounded-full px-3 py-1 font-medium ${getStatusClasses(data.booking.verificationStatus)}`}>
             Verification {data.booking.verificationStatus.replaceAll("_", " ")}
           </span>
+          <span className={`rounded-full px-3 py-1 font-medium ${getStatusClasses(data.booking.paymentStatus)}`}>
+            Payment {data.booking.paymentStatus.replaceAll("_", " ")}
+          </span>
           <span className="rounded-full border border-slate-700 px-3 py-1 text-slate-300">
             {formatDate(data.booking.startDate)} to {formatDate(data.booking.endDate)}
           </span>
         </div>
         {isDemoMode ? (
-          <p className="mt-4 text-sm text-slate-400">Demo mode is active here, so booking updates validate and redirect but do not persist yet.</p>
+          <p className="mt-4 text-sm text-slate-400">
+            Demo mode is active here, so booking updates validate and redirect but do not persist yet.
+          </p>
         ) : null}
       </div>
 
@@ -121,6 +147,12 @@ export default async function OperatorBookingDetailPage({
             <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/60 p-4 text-sm text-slate-300">
               <p className="font-medium text-slate-100">{paymentSummary.label}</p>
               <p className="mt-2">{paymentSummary.note}</p>
+              {data.booking.paymentReference ? (
+                <p className="mt-3 text-slate-400">Reference: {data.booking.paymentReference}</p>
+              ) : null}
+              {data.booking.paymentCapturedAt ? (
+                <p className="mt-2 text-slate-400">Captured: {formatDateTime(data.booking.paymentCapturedAt)}</p>
+              ) : null}
             </div>
           </div>
         </section>
@@ -165,16 +197,26 @@ export default async function OperatorBookingDetailPage({
                 </>
               ) : null}
 
-              {data.booking.status === "APPROVED" ? (
-                <form action={updateBookingStatus}>
+              {data.booking.status === "APPROVED" && data.booking.paymentStatus === "PENDING_CAPTURE" ? (
+                <form action={updateBookingStatus} className="flex w-full flex-col gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4 sm:w-auto">
                   <input type="hidden" name="bookingId" value={data.booking.id} />
                   <input type="hidden" name="nextStatus" value="PAID" />
                   <input type="hidden" name="returnTo" value={`/operator/bookings/${data.booking.id}`} />
+                  <label className="text-xs uppercase tracking-wide text-slate-500">
+                    Payment reference
+                    <input
+                      type="text"
+                      name="paymentReference"
+                      defaultValue={data.booking.paymentReference ?? ""}
+                      placeholder="stripe_pi_... or manual note"
+                      className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-orange-400"
+                    />
+                  </label>
                   <button
                     type="submit"
                     className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-orange-400"
                   >
-                    Mark paid
+                    Capture payment
                   </button>
                 </form>
               ) : null}
@@ -185,24 +227,89 @@ export default async function OperatorBookingDetailPage({
               >
                 Open listing workflow
               </Link>
+              <Link
+                href={`/customer/bookings/${data.booking.id}`}
+                className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500"
+              >
+                Open customer status view
+              </Link>
             </div>
           </div>
 
           <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-            <h2 className="text-xl font-semibold">Notification previews</h2>
+            <h2 className="text-xl font-semibold">Notification flow</h2>
             <div className="mt-4 space-y-4 text-sm text-slate-300">
               <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-                <p className="text-xs uppercase tracking-wide text-slate-500">Customer</p>
-                <p className="mt-2 font-medium text-slate-100">{customerNotification.title}</p>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">Customer</p>
+                    <p className="mt-2 font-medium text-slate-100">{customerNotification.title}</p>
+                  </div>
+                  <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(customerNotification.state)}`}>
+                    {customerNotification.state}
+                  </span>
+                </div>
                 <p className="mt-2 text-slate-400">To: {customerNotification.audience}</p>
+                <p className="mt-2 text-slate-400">Last sent: {formatDateTime(customerNotification.sentAt)}</p>
                 <p className="mt-3">{customerNotification.body}</p>
+                <form action={sendBookingNotification} className="mt-4">
+                  <input type="hidden" name="bookingId" value={data.booking.id} />
+                  <input type="hidden" name="audience" value="customer" />
+                  <input type="hidden" name="returnTo" value={`/operator/bookings/${data.booking.id}`} />
+                  <button
+                    type="submit"
+                    className="rounded-lg border border-orange-400/50 px-4 py-2 text-sm font-medium text-orange-200 transition hover:border-orange-300"
+                  >
+                    {customerNotification.state === "SENT" ? "Resend customer update" : "Send customer update"}
+                  </button>
+                </form>
               </div>
               <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-                <p className="text-xs uppercase tracking-wide text-slate-500">Operations</p>
-                <p className="mt-2 font-medium text-slate-100">{opsNotification.title}</p>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">Operations</p>
+                    <p className="mt-2 font-medium text-slate-100">{opsNotification.title}</p>
+                  </div>
+                  <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(opsNotification.state)}`}>
+                    {opsNotification.state}
+                  </span>
+                </div>
                 <p className="mt-2 text-slate-400">To: {opsNotification.audience}</p>
+                <p className="mt-2 text-slate-400">Last sent: {formatDateTime(opsNotification.sentAt)}</p>
                 <p className="mt-3">{opsNotification.body}</p>
+                <form action={sendBookingNotification} className="mt-4">
+                  <input type="hidden" name="bookingId" value={data.booking.id} />
+                  <input type="hidden" name="audience" value="ops" />
+                  <input type="hidden" name="returnTo" value={`/operator/bookings/${data.booking.id}`} />
+                  <button
+                    type="submit"
+                    className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-400"
+                  >
+                    {opsNotification.state === "SENT" ? "Resend ops update" : "Send ops update"}
+                  </button>
+                </form>
               </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
+            <h2 className="text-xl font-semibold">Booking timeline</h2>
+            <div className="mt-4 space-y-4">
+              {data.timeline.map((event) => (
+                <div key={event.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 text-sm text-slate-300">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="font-medium text-slate-100">{event.title}</p>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">{formatDateTime(event.occurredAt)}</p>
+                  </div>
+                  <p className="mt-2">{event.detail}</p>
+                  {(event.actorName || event.actorRole) ? (
+                    <p className="mt-3 text-xs uppercase tracking-wide text-slate-500">
+                      {event.actorName ?? "Unknown"}
+                      {event.actorRole ? ` • ${event.actorRole}` : ""}
+                    </p>
+                  ) : null}
+                </div>
+              ))}
             </div>
           </div>
         </section>

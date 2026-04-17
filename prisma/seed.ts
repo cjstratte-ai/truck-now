@@ -3,6 +3,7 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main() {
+  await prisma.bookingTimelineEvent.deleteMany();
   await prisma.booking.deleteMany();
   await prisma.listing.deleteMany();
   await prisma.user.deleteMany();
@@ -15,7 +16,7 @@ async function main() {
     },
   });
 
-  await prisma.user.create({
+  const customer = await prisma.user.create({
     data: {
       email: "customer@trucksnow.com",
       name: "Demo Customer",
@@ -84,6 +85,122 @@ async function main() {
       },
     ],
   });
+
+  const listings = await prisma.listing.findMany({
+    orderBy: {
+      createdAt: "asc",
+    },
+    select: {
+      id: true,
+      dailyRate: true,
+    },
+  });
+
+  if (listings.length >= 2) {
+    await prisma.booking.createMany({
+      data: [
+        {
+          listingId: listings[0].id,
+          customerId: customer.id,
+          startDate: new Date("2026-04-18T00:00:00.000Z"),
+          endDate: new Date("2026-04-20T00:00:00.000Z"),
+          totalAmount: listings[0].dailyRate * 2,
+          status: "REQUESTED",
+          verificationStatus: "PENDING",
+          paymentStatus: "NOT_READY",
+          customerNotificationKind: "REQUEST_RECEIVED",
+          customerNotificationState: "SENT",
+          customerNotificationSentAt: new Date("2026-04-16T14:05:00.000Z"),
+          opsNotificationKind: "REQUEST_REVIEW",
+          opsNotificationState: "PENDING",
+        },
+        {
+          listingId: listings[1].id,
+          customerId: customer.id,
+          startDate: new Date("2026-04-22T00:00:00.000Z"),
+          endDate: new Date("2026-04-25T00:00:00.000Z"),
+          totalAmount: listings[1].dailyRate * 3,
+          status: "APPROVED",
+          verificationStatus: "APPROVED",
+          paymentStatus: "PENDING_CAPTURE",
+          customerNotificationKind: "BOOKING_APPROVED",
+          customerNotificationState: "PENDING",
+          opsNotificationKind: "PAYMENT_FOLLOW_UP",
+          opsNotificationState: "SENT",
+          opsNotificationSentAt: new Date("2026-04-16T15:10:00.000Z"),
+        },
+      ],
+    });
+
+    const bookings = await prisma.booking.findMany({
+      orderBy: {
+        createdAt: "asc",
+      },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+
+    if (bookings[0]) {
+      await prisma.bookingTimelineEvent.createMany({
+        data: [
+          {
+            bookingId: bookings[0].id,
+            eventType: "BOOKING_REQUESTED",
+            title: "Booking requested",
+            detail: "Demo Customer requested the Dallas Ford F-250 for a two-day rental window.",
+            actorRole: "CUSTOMER",
+            actorName: "Demo Customer",
+            occurredAt: new Date("2026-04-16T14:00:00.000Z"),
+          },
+          {
+            bookingId: bookings[0].id,
+            eventType: "CUSTOMER_NOTIFICATION_SENT",
+            title: "Customer confirmation sent",
+            detail: "The booking confirmation email was marked sent to customer@trucksnow.com.",
+            actorRole: "SYSTEM",
+            actorName: "Workflow automation",
+            occurredAt: new Date("2026-04-16T14:05:00.000Z"),
+          },
+        ],
+      });
+    }
+
+    if (bookings[1]) {
+      await prisma.bookingTimelineEvent.createMany({
+        data: [
+          {
+            bookingId: bookings[1].id,
+            eventType: "BOOKING_REQUESTED",
+            title: "Booking requested",
+            detail: "Demo Customer requested the Houston Isuzu NPR for a three-day rental window.",
+            actorRole: "CUSTOMER",
+            actorName: "Demo Customer",
+            occurredAt: new Date("2026-04-16T14:20:00.000Z"),
+          },
+          {
+            bookingId: bookings[1].id,
+            eventType: "BOOKING_APPROVED",
+            title: "Booking approved",
+            detail: "Platform Admin approved the booking and moved it into payment capture.",
+            actorRole: "ADMIN",
+            actorName: "Platform Admin",
+            occurredAt: new Date("2026-04-16T15:00:00.000Z"),
+          },
+          {
+            bookingId: bookings[1].id,
+            eventType: "OPS_NOTIFICATION_SENT",
+            title: "Ops update sent",
+            detail: "The ops payment follow-up update was marked sent.",
+            actorRole: "SYSTEM",
+            actorName: "Workflow automation",
+            occurredAt: new Date("2026-04-16T15:10:00.000Z"),
+          },
+        ],
+      });
+    }
+  }
 
   console.log("Seeded demo users and listings for Trucks Now.");
 }

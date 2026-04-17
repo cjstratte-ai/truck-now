@@ -13,15 +13,48 @@ export type InventoryItem = {
   description: string;
 };
 
+export type CustomerBookingSummary = {
+  id: string;
+  listingId: string;
+  listingTitle: string;
+  city: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  verificationStatus: string;
+  paymentStatus: string;
+  totalAmount: number;
+};
+
 export type CustomerInventoryData = {
   sourceLabel: string;
   listings: InventoryItem[];
+  bookings: CustomerBookingSummary[];
 };
 
 export type CustomerListingDetail = {
   sourceLabel: string;
   listing: InventoryItem;
   highlights: string[];
+};
+
+export type CustomerBookingDetail = {
+  sourceLabel: string;
+  booking: OperatorBooking & {
+    customerEmail: string;
+  };
+  nextSteps: string[];
+  timeline: BookingTimelineEntry[];
+};
+
+export type BookingTimelineEntry = {
+  id: string;
+  eventType: string;
+  title: string;
+  detail: string;
+  actorRole: string | null;
+  actorName: string | null;
+  occurredAt: string;
 };
 
 export type OperatorListing = {
@@ -49,6 +82,15 @@ export type OperatorBooking = {
   status: string;
   verificationStatus: string;
   totalAmount: number;
+  paymentStatus: string;
+  paymentCapturedAt: string | null;
+  paymentReference: string | null;
+  customerNotificationKind: string | null;
+  customerNotificationState: string;
+  customerNotificationSentAt: string | null;
+  opsNotificationKind: string | null;
+  opsNotificationState: string;
+  opsNotificationSentAt: string | null;
 };
 
 export type OperatorDashboardData = {
@@ -86,6 +128,7 @@ export type OperatorBookingDetail = {
   };
   actionItems: string[];
   checklist: string[];
+  timeline: BookingTimelineEntry[];
 };
 
 export type AdminListingReview = {
@@ -105,6 +148,15 @@ export type AdminBookingReview = {
   status: string;
   verificationStatus: string;
   totalAmount: number;
+  paymentStatus: string;
+  paymentCapturedAt: string | null;
+  paymentReference: string | null;
+  customerNotificationKind: string | null;
+  customerNotificationState: string;
+  customerNotificationSentAt: string | null;
+  opsNotificationKind: string | null;
+  opsNotificationState: string;
+  opsNotificationSentAt: string | null;
 };
 
 export type AdminDashboardData = {
@@ -146,6 +198,7 @@ export type AdminBookingReviewDetail = {
   };
   actionItems: string[];
   checklist: string[];
+  timeline: BookingTimelineEntry[];
 };
 
 type ListingRecord = InventoryItem & {
@@ -167,6 +220,16 @@ type BookingRecord = {
   totalAmount: number;
   status: string;
   verificationStatus: string;
+  paymentStatus: string;
+  paymentCapturedAt: string | null;
+  paymentReference: string | null;
+  customerNotificationKind: string | null;
+  customerNotificationState: string;
+  customerNotificationSentAt: string | null;
+  opsNotificationKind: string | null;
+  opsNotificationState: string;
+  opsNotificationSentAt: string | null;
+  timeline: BookingTimelineEntry[];
 };
 
 type CatalogData = {
@@ -266,6 +329,35 @@ const fallbackBookings: BookingRecord[] = [
     totalAmount: 29800,
     status: "REQUESTED",
     verificationStatus: "PENDING",
+    paymentStatus: "NOT_READY",
+    paymentCapturedAt: null,
+    paymentReference: null,
+    customerNotificationKind: "REQUEST_RECEIVED",
+    customerNotificationState: "SENT",
+    customerNotificationSentAt: "2026-04-16T14:05:00.000Z",
+    opsNotificationKind: "REQUEST_REVIEW",
+    opsNotificationState: "PENDING",
+    opsNotificationSentAt: null,
+    timeline: [
+      {
+        id: "booking-1-event-1",
+        eventType: "BOOKING_REQUESTED",
+        title: "Booking requested",
+        detail: "Demo Customer requested the Dallas Ford F-250 for a two-day rental window.",
+        actorRole: "CUSTOMER",
+        actorName: "Demo Customer",
+        occurredAt: "2026-04-16T14:00:00.000Z",
+      },
+      {
+        id: "booking-1-event-2",
+        eventType: "CUSTOMER_NOTIFICATION_SENT",
+        title: "Customer confirmation sent",
+        detail: "The booking confirmation email was marked sent to customer@trucksnow.com.",
+        actorRole: "SYSTEM",
+        actorName: "Workflow automation",
+        occurredAt: "2026-04-16T14:05:00.000Z",
+      },
+    ],
   },
   {
     id: "booking-2",
@@ -280,6 +372,44 @@ const fallbackBookings: BookingRecord[] = [
     totalAmount: 53700,
     status: "APPROVED",
     verificationStatus: "APPROVED",
+    paymentStatus: "PENDING_CAPTURE",
+    paymentCapturedAt: null,
+    paymentReference: null,
+    customerNotificationKind: "BOOKING_APPROVED",
+    customerNotificationState: "PENDING",
+    customerNotificationSentAt: null,
+    opsNotificationKind: "PAYMENT_FOLLOW_UP",
+    opsNotificationState: "SENT",
+    opsNotificationSentAt: "2026-04-16T15:10:00.000Z",
+    timeline: [
+      {
+        id: "booking-2-event-1",
+        eventType: "BOOKING_REQUESTED",
+        title: "Booking requested",
+        detail: "Northside Builders requested the Houston Isuzu NPR for a three-day rental window.",
+        actorRole: "CUSTOMER",
+        actorName: "Northside Builders",
+        occurredAt: "2026-04-16T14:20:00.000Z",
+      },
+      {
+        id: "booking-2-event-2",
+        eventType: "BOOKING_APPROVED",
+        title: "Booking approved",
+        detail: "Platform Admin approved the booking and moved it into payment capture.",
+        actorRole: "ADMIN",
+        actorName: "Platform Admin",
+        occurredAt: "2026-04-16T15:00:00.000Z",
+      },
+      {
+        id: "booking-2-event-3",
+        eventType: "OPS_NOTIFICATION_SENT",
+        title: "Ops update sent",
+        detail: "The ops payment follow-up update was marked sent.",
+        actorRole: "SYSTEM",
+        actorName: "Workflow automation",
+        occurredAt: "2026-04-16T15:10:00.000Z",
+      },
+    ],
   },
   {
     id: "booking-3",
@@ -294,6 +424,53 @@ const fallbackBookings: BookingRecord[] = [
     totalAmount: 29800,
     status: "PAID",
     verificationStatus: "APPROVED",
+    paymentStatus: "CAPTURED",
+    paymentCapturedAt: "2026-04-07T16:45:00.000Z",
+    paymentReference: "pay_demo_1003",
+    customerNotificationKind: "PAYMENT_CONFIRMED",
+    customerNotificationState: "SENT",
+    customerNotificationSentAt: "2026-04-07T16:46:00.000Z",
+    opsNotificationKind: "HANDOFF_READY",
+    opsNotificationState: "SENT",
+    opsNotificationSentAt: "2026-04-07T16:47:00.000Z",
+    timeline: [
+      {
+        id: "booking-3-event-1",
+        eventType: "BOOKING_APPROVED",
+        title: "Booking approved",
+        detail: "Operator approved the booking and cleared it for payment.",
+        actorRole: "OPERATOR",
+        actorName: "Texas Fleet Rentals",
+        occurredAt: "2026-04-07T15:55:00.000Z",
+      },
+      {
+        id: "booking-3-event-2",
+        eventType: "PAYMENT_CAPTURED",
+        title: "Payment captured",
+        detail: "Payment was captured with reference pay_demo_1003.",
+        actorRole: "OPERATOR",
+        actorName: "Texas Fleet Rentals",
+        occurredAt: "2026-04-07T16:45:00.000Z",
+      },
+      {
+        id: "booking-3-event-3",
+        eventType: "CUSTOMER_NOTIFICATION_SENT",
+        title: "Customer payment update sent",
+        detail: "The payment confirmation was marked sent to ops@riverfrontmoving.com.",
+        actorRole: "SYSTEM",
+        actorName: "Workflow automation",
+        occurredAt: "2026-04-07T16:46:00.000Z",
+      },
+      {
+        id: "booking-3-event-4",
+        eventType: "OPS_NOTIFICATION_SENT",
+        title: "Ops handoff update sent",
+        detail: "The handoff-ready update was marked sent to operations.",
+        actorRole: "SYSTEM",
+        actorName: "Workflow automation",
+        occurredAt: "2026-04-07T16:47:00.000Z",
+      },
+    ],
   },
 ];
 
@@ -349,6 +526,15 @@ function mapOperatorBooking(booking: BookingRecord): OperatorBooking {
     status: booking.status,
     verificationStatus: booking.verificationStatus,
     totalAmount: booking.totalAmount,
+    paymentStatus: booking.paymentStatus,
+    paymentCapturedAt: booking.paymentCapturedAt,
+    paymentReference: booking.paymentReference,
+    customerNotificationKind: booking.customerNotificationKind,
+    customerNotificationState: booking.customerNotificationState,
+    customerNotificationSentAt: booking.customerNotificationSentAt,
+    opsNotificationKind: booking.opsNotificationKind,
+    opsNotificationState: booking.opsNotificationState,
+    opsNotificationSentAt: booking.opsNotificationSentAt,
   };
 }
 
@@ -390,6 +576,15 @@ function mapAdminBookingReview(booking: BookingRecord): AdminBookingReview {
     status: booking.status,
     verificationStatus: booking.verificationStatus,
     totalAmount: booking.totalAmount,
+    paymentStatus: booking.paymentStatus,
+    paymentCapturedAt: booking.paymentCapturedAt,
+    paymentReference: booking.paymentReference,
+    customerNotificationKind: booking.customerNotificationKind,
+    customerNotificationState: booking.customerNotificationState,
+    customerNotificationSentAt: booking.customerNotificationSentAt,
+    opsNotificationKind: booking.opsNotificationKind,
+    opsNotificationState: booking.opsNotificationState,
+    opsNotificationSentAt: booking.opsNotificationSentAt,
   };
 }
 
@@ -417,7 +612,13 @@ function getOperatorListingActionItems(status: string) {
   ];
 }
 
-function getOperatorBookingActionItems(status: string, verificationStatus: string) {
+function getOperatorBookingActionItems(
+  status: string,
+  verificationStatus: string,
+  paymentStatus: string,
+  customerNotificationState: string,
+  opsNotificationState: string,
+) {
   const actionItems: string[] = [];
 
   if (status === "REQUESTED") {
@@ -428,12 +629,20 @@ function getOperatorBookingActionItems(status: string, verificationStatus: strin
     actionItems.push("Check verification status before approving keys or delivery instructions.");
   }
 
-  if (status === "APPROVED") {
-    actionItems.push("Confirm payment capture and send pickup details once everything clears.");
+  if (status === "APPROVED" && paymentStatus === "PENDING_CAPTURE") {
+    actionItems.push("Capture payment and attach the reference so the handoff trail is real.");
   }
 
-  if (status === "PAID") {
+  if (paymentStatus === "CAPTURED") {
     actionItems.push("Prepare handoff logistics and keep the return window visible for the operator team.");
+  }
+
+  if (customerNotificationState === "PENDING") {
+    actionItems.push("Send the latest customer update so the workflow state is not only internal.");
+  }
+
+  if (opsNotificationState === "PENDING") {
+    actionItems.push("Push the latest ops notification so dispatch and handoff stay in sync.");
   }
 
   if (actionItems.length === 0) {
@@ -461,7 +670,13 @@ function getAdminListingActionItems(status: string) {
   ];
 }
 
-function getAdminBookingActionItems(status: string, verificationStatus: string) {
+function getAdminBookingActionItems(
+  status: string,
+  verificationStatus: string,
+  paymentStatus: string,
+  customerNotificationState: string,
+  opsNotificationState: string,
+) {
   const actionItems: string[] = [];
 
   if (status === "REQUESTED") {
@@ -472,15 +687,23 @@ function getAdminBookingActionItems(status: string, verificationStatus: string) 
     actionItems.push("Review the verification lane before the rental window starts.");
   }
 
-  if (status === "APPROVED") {
-    actionItems.push("Confirm the renter can move cleanly from approval to payment and handoff.");
+  if (status === "APPROVED" && paymentStatus === "PENDING_CAPTURE") {
+    actionItems.push("Make sure payment capture happens before the rental moves into pickup coordination.");
+  }
+
+  if (customerNotificationState === "PENDING") {
+    actionItems.push("A customer-facing workflow message is still waiting to be sent.");
+  }
+
+  if (opsNotificationState === "PENDING") {
+    actionItems.push("Ops still needs the latest booking update for queue accuracy.");
   }
 
   if (actionItems.length === 0) {
     actionItems.push("Review the booking details and confirm no manual admin intervention is still required.");
   }
 
-  actionItems.push("Use this page to keep booking status and verification status aligned.");
+  actionItems.push("Use this page to keep booking status, payment state, and notifications aligned.");
 
   return actionItems;
 }
@@ -536,6 +759,29 @@ async function loadCatalog(): Promise<CatalogData> {
           totalAmount: true,
           status: true,
           verificationStatus: true,
+          paymentStatus: true,
+          paymentCapturedAt: true,
+          paymentReference: true,
+          customerNotificationKind: true,
+          customerNotificationState: true,
+          customerNotificationSentAt: true,
+          opsNotificationKind: true,
+          opsNotificationState: true,
+          opsNotificationSentAt: true,
+          timelineEvents: {
+            orderBy: {
+              occurredAt: "desc",
+            },
+            select: {
+              id: true,
+              eventType: true,
+              title: true,
+              detail: true,
+              actorRole: true,
+              actorName: true,
+              occurredAt: true,
+            },
+          },
           listing: {
             select: {
               title: true,
@@ -585,6 +831,24 @@ async function loadCatalog(): Promise<CatalogData> {
       totalAmount: number;
       status: string;
       verificationStatus: string;
+      paymentStatus: string;
+      paymentCapturedAt: Date | null;
+      paymentReference: string | null;
+      customerNotificationKind: string | null;
+      customerNotificationState: string;
+      customerNotificationSentAt: Date | null;
+      opsNotificationKind: string | null;
+      opsNotificationState: string;
+      opsNotificationSentAt: Date | null;
+      timelineEvents: Array<{
+        id: string;
+        eventType: string;
+        title: string;
+        detail: string;
+        actorRole: string | null;
+        actorName: string | null;
+        occurredAt: Date;
+      }>;
       listing: {
         title: string;
         city: string;
@@ -630,6 +894,24 @@ async function loadCatalog(): Promise<CatalogData> {
         totalAmount: booking.totalAmount,
         status: booking.status,
         verificationStatus: booking.verificationStatus,
+        paymentStatus: booking.paymentStatus,
+        paymentCapturedAt: booking.paymentCapturedAt?.toISOString() ?? null,
+        paymentReference: booking.paymentReference,
+        customerNotificationKind: booking.customerNotificationKind,
+        customerNotificationState: booking.customerNotificationState,
+        customerNotificationSentAt: booking.customerNotificationSentAt?.toISOString() ?? null,
+        opsNotificationKind: booking.opsNotificationKind,
+        opsNotificationState: booking.opsNotificationState,
+        opsNotificationSentAt: booking.opsNotificationSentAt?.toISOString() ?? null,
+        timeline: booking.timelineEvents.map((event) => ({
+          id: event.id,
+          eventType: event.eventType,
+          title: event.title,
+          detail: event.detail,
+          actorRole: event.actorRole,
+          actorName: event.actorName,
+          occurredAt: event.occurredAt.toISOString(),
+        })),
       })),
     };
   } catch {
@@ -646,30 +928,8 @@ export async function getActiveListings(): Promise<InventoryItem[]> {
 
   return listings
     .filter((listing) => listing.status === "ACTIVE")
-    .map(({ id, slug, title, photoUrls, vehicleType, boxSizeFeet, passengerCapacity, hasRamp, city, state, dailyRate, description }) => ({
-      id,
-      slug,
-      title,
-      photoUrls,
-      vehicleType,
-      boxSizeFeet,
-      passengerCapacity,
-      hasRamp,
-      city,
-      state,
-      dailyRate,
-      description,
-    }));
-}
-
-export async function getCustomerInventoryData(): Promise<CustomerInventoryData> {
-  const { source, listings } = await loadCatalog();
-
-  return {
-    sourceLabel: getSourceLabel(source, "inventory"),
-    listings: listings
-      .filter((listing) => listing.status === "ACTIVE")
-      .map(({ id, slug, title, photoUrls, vehicleType, boxSizeFeet, passengerCapacity, hasRamp, city, state, dailyRate, description }) => ({
+    .map(
+      ({ id, slug, title, photoUrls, vehicleType, boxSizeFeet, passengerCapacity, hasRamp, city, state, dailyRate, description }) => ({
         id,
         slug,
         title,
@@ -682,7 +942,50 @@ export async function getCustomerInventoryData(): Promise<CustomerInventoryData>
         state,
         dailyRate,
         description,
-      })),
+      }),
+    );
+}
+
+export async function getCustomerInventoryData(customerEmail?: string): Promise<CustomerInventoryData> {
+  const { source, listings, bookings } = await loadCatalog();
+
+  return {
+    sourceLabel: getSourceLabel(source, "inventory"),
+    listings: listings
+      .filter((listing) => listing.status === "ACTIVE")
+      .map(
+        ({ id, slug, title, photoUrls, vehicleType, boxSizeFeet, passengerCapacity, hasRamp, city, state, dailyRate, description }) => ({
+          id,
+          slug,
+          title,
+          photoUrls,
+          vehicleType,
+          boxSizeFeet,
+          passengerCapacity,
+          hasRamp,
+          city,
+          state,
+          dailyRate,
+          description,
+        }),
+      ),
+    bookings: customerEmail
+      ? bookings
+          .filter((booking) => booking.customerEmail === customerEmail)
+          .slice(0, 6)
+          .map((booking) => ({
+            id: booking.id,
+            listingId: booking.listingId,
+            listingTitle: booking.listingTitle,
+            city: booking.city,
+            startDate: booking.startDate,
+            endDate: booking.endDate,
+            status: booking.status,
+            verificationStatus: booking.verificationStatus,
+            paymentStatus: booking.paymentStatus,
+            totalAmount: booking.totalAmount,
+          }))
+      : [],
   };
 }
 
@@ -715,6 +1018,57 @@ export async function getCustomerListingDetail(id: string): Promise<CustomerList
       "Clear review before approval so the rental window stays organized.",
       "Useful for moves, deliveries, and work-site jobs without a long-term commitment.",
     ],
+  };
+}
+
+function getCustomerBookingNextSteps(status: string, verificationStatus: string, paymentStatus: string) {
+  const steps: string[] = [];
+
+  if (status === "REQUESTED") {
+    steps.push("Your request is in review. The team is confirming dates, availability, and handoff details.");
+  }
+
+  if (verificationStatus === "PENDING") {
+    steps.push("Verification is still open, so approval and payment stay behind that step.");
+  }
+
+  if (status === "APPROVED" && paymentStatus === "PENDING_CAPTURE") {
+    steps.push("The booking is approved. Payment is the next step before pickup planning locks in.");
+  }
+
+  if (paymentStatus === "CAPTURED") {
+    steps.push("Payment is confirmed, so the next update should be pickup and handoff instructions.");
+  }
+
+  if (status === "REJECTED" || verificationStatus === "REJECTED") {
+    steps.push("This booking is blocked right now. If you still need a truck, the team can help you review another option.");
+  }
+
+  if (steps.length === 0) {
+    steps.push("The workflow is moving, and the next update should arrive through the customer status lane.");
+  }
+
+  steps.push("Use this page as your current source of truth before reaching out about timing or payment.");
+
+  return steps;
+}
+
+export async function getCustomerBookingDetail(id: string, customerEmail?: string): Promise<CustomerBookingDetail | null> {
+  const { source, bookings } = await loadCatalog();
+  const booking = bookings.find((item) => item.id === id && (!customerEmail || item.customerEmail === customerEmail));
+
+  if (!booking) {
+    return null;
+  }
+
+  return {
+    sourceLabel: getSourceLabel(source, "customer booking"),
+    booking: {
+      ...mapOperatorBooking(booking),
+      customerEmail: booking.customerEmail,
+    },
+    nextSteps: getCustomerBookingNextSteps(booking.status, booking.verificationStatus, booking.paymentStatus),
+    timeline: booking.timeline,
   };
 }
 
@@ -788,12 +1142,19 @@ export async function getOperatorBookingDetail(id: string, ownerEmail?: string):
       ...mapOperatorBooking(booking),
       customerEmail: booking.customerEmail,
     },
-    actionItems: getOperatorBookingActionItems(booking.status, booking.verificationStatus),
+    actionItems: getOperatorBookingActionItems(
+      booking.status,
+      booking.verificationStatus,
+      booking.paymentStatus,
+      booking.customerNotificationState,
+      booking.opsNotificationState,
+    ),
     checklist: [
       "Dates and total amount match the intended rental window.",
       "Verification status is appropriate for the next operator action.",
       "Pickup and return instructions are ready before customer communication.",
     ],
+    timeline: booking.timeline,
   };
 }
 
@@ -866,11 +1227,18 @@ export async function getAdminBookingReviewDetail(id: string): Promise<AdminBook
       endDate: booking.endDate,
       customerEmail: booking.customerEmail,
     },
-    actionItems: getAdminBookingActionItems(booking.status, booking.verificationStatus),
+    actionItems: getAdminBookingActionItems(
+      booking.status,
+      booking.verificationStatus,
+      booking.paymentStatus,
+      booking.customerNotificationState,
+      booking.opsNotificationState,
+    ),
     checklist: [
-      "Booking status and verification status do not contradict each other.",
+      "Booking status, payment state, and verification status do not contradict each other.",
       "The listing, renter, and rental dates look internally consistent.",
       "Any manual admin follow-up is clear before the booking window opens.",
     ],
+    timeline: booking.timeline,
   };
 }
