@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { bulkReviewListings, bulkUpdateBookingStatuses, bulkUpdateVerificationStatuses } from "@/app/actions";
+import { BulkSelectControls } from "@/src/components/bulk-select-controls";
 import { requireRole } from "@/src/lib/auth";
 import { getAdminDashboardData } from "@/src/lib/inventory";
 
@@ -723,6 +724,7 @@ export default async function AdminPage({
                     <p className="text-xs text-slate-400">Select pending items below, then approve or reject them together.</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    <BulkSelectControls targetName="listingIds" />
                     <button
                       type="submit"
                       name="nextStatus"
@@ -926,6 +928,7 @@ export default async function AdminPage({
                     <p className="text-xs text-slate-400">Approve or reject selected requests in one pass.</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    <BulkSelectControls targetName="bookingIds" />
                     <button
                       type="submit"
                       name="nextStatus"
@@ -1134,6 +1137,7 @@ export default async function AdminPage({
                     <p className="text-xs text-slate-400">Clear or reject multiple verification items together.</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    <BulkSelectControls targetName="bookingIds" />
                     <button
                       type="submit"
                       name="nextStatus"
