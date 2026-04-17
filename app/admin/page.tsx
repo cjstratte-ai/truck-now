@@ -13,12 +13,24 @@ type AdminFilters = {
   listingSort?: string;
   bookingSort?: string;
   verificationSort?: string;
+  listingAge?: string;
+  bookingAge?: string;
+  verificationAge?: string;
+  bookingWindow?: string;
+  bookingPayment?: string;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function formatCurrency(amount: number) {
   return `$${(amount / 100).toFixed(2)}`;
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function getStatusClasses(status: string) {
@@ -43,7 +55,7 @@ function getTimestamp(value?: string | null) {
   return value ? new Date(value).getTime() : 0;
 }
 
-function getAgeMeta(value?: string | null, staleAfterDays = 3) {
+function getAgeDays(value?: string | null) {
   if (!value) {
     return null;
   }
@@ -54,7 +66,19 @@ function getAgeMeta(value?: string | null, staleAfterDays = 3) {
     return null;
   }
 
-  const diffDays = Math.floor(diffMs / DAY_MS);
+  return Math.floor(diffMs / DAY_MS);
+}
+
+function getLocalDayKey(value: string) {
+  return new Date(value).toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+}
+
+function getAgeMeta(value?: string | null, staleAfterDays = 3) {
+  const diffDays = getAgeDays(value);
+
+  if (diffDays === null) {
+    return null;
+  }
   const label = diffDays === 0 ? "new today" : diffDays === 1 ? "1d old" : `${diffDays}d old`;
 
   if (diffDays >= staleAfterDays) {
@@ -87,6 +111,11 @@ function buildAdminHref(current: AdminFilters, updates: Partial<Record<keyof Adm
   const listingSort = next.listingSort ?? "age";
   const bookingSort = next.bookingSort ?? "age";
   const verificationSort = next.verificationSort ?? "age";
+  const listingAge = next.listingAge ?? "all";
+  const bookingAge = next.bookingAge ?? "all";
+  const verificationAge = next.verificationAge ?? "all";
+  const bookingWindow = next.bookingWindow ?? "all";
+  const bookingPayment = next.bookingPayment ?? "all";
   const listingSearch = next.listingSearch?.trim() ?? "";
   const bookingSearch = next.bookingSearch?.trim() ?? "";
   const verificationSearch = next.verificationSearch?.trim() ?? "";
@@ -113,6 +142,26 @@ function buildAdminHref(current: AdminFilters, updates: Partial<Record<keyof Adm
 
   if (verificationSearch) {
     params.set("verificationSearch", verificationSearch);
+  }
+
+  if (listingAge !== "all") {
+    params.set("listingAge", listingAge);
+  }
+
+  if (bookingAge !== "all") {
+    params.set("bookingAge", bookingAge);
+  }
+
+  if (verificationAge !== "all") {
+    params.set("verificationAge", verificationAge);
+  }
+
+  if (bookingWindow !== "all") {
+    params.set("bookingWindow", bookingWindow);
+  }
+
+  if (bookingPayment !== "all") {
+    params.set("bookingPayment", bookingPayment);
   }
 
   if (listingSort !== "age") {
@@ -149,6 +198,12 @@ export default async function AdminPage({
   const listingSort = filters.listingSort ?? "age";
   const bookingSort = filters.bookingSort ?? "age";
   const verificationSort = filters.verificationSort ?? "age";
+  const listingAge = filters.listingAge ?? "all";
+  const bookingAge = filters.bookingAge ?? "all";
+  const verificationAge = filters.verificationAge ?? "all";
+  const bookingWindow = filters.bookingWindow ?? "all";
+  const bookingPayment = filters.bookingPayment ?? "all";
+  const todayKey = getLocalDayKey(new Date().toISOString());
 
   const filteredListings = data.listings.filter((listing) => {
     const matchesSearch =
@@ -159,6 +214,13 @@ export default async function AdminPage({
 
     if (!matchesSearch) {
       return false;
+    }
+
+    if (listingAge === "48h") {
+      const ageDays = getAgeDays(listing.createdAt);
+      if (ageDays === null || ageDays < 2) {
+        return false;
+      }
     }
 
     switch (listingFilter) {
@@ -194,6 +256,21 @@ export default async function AdminPage({
       );
 
     if (!matchesSearch) {
+      return false;
+    }
+
+    if (bookingAge === "48h") {
+      const ageDays = getAgeDays(booking.createdAt);
+      if (ageDays === null || ageDays < 2) {
+        return false;
+      }
+    }
+
+    if (bookingWindow === "today" && getLocalDayKey(booking.startDate) !== todayKey) {
+      return false;
+    }
+
+    if (bookingPayment === "chase" && booking.paymentStatus === "CAPTURED") {
       return false;
     }
 
@@ -233,6 +310,13 @@ export default async function AdminPage({
 
     if (!matchesSearch) {
       return false;
+    }
+
+    if (verificationAge === "48h") {
+      const ageDays = getAgeDays(booking.createdAt);
+      if (ageDays === null || ageDays < 2) {
+        return false;
+      }
     }
 
     switch (verificationFilter) {
@@ -335,6 +419,28 @@ export default async function AdminPage({
       }),
     },
     {
+      label: "Today only",
+      href: buildAdminHref(filters, {
+        bookingWindow: "today",
+        bookingSort: "newest",
+        bookingSearch: "",
+      }),
+    },
+    {
+      label: "48h stale",
+      href: buildAdminHref(filters, {
+        listingAge: "48h",
+        bookingAge: "48h",
+        verificationAge: "48h",
+        listingSort: "age",
+        bookingSort: "age",
+        verificationSort: "age",
+        listingSearch: "",
+        bookingSearch: "",
+        verificationSearch: "",
+      }),
+    },
+    {
       label: "Rejected cleanup",
       href: buildAdminHref(filters, {
         listingFilter: "rejected",
@@ -349,6 +455,15 @@ export default async function AdminPage({
       }),
     },
     {
+      label: "High dollar first",
+      href: buildAdminHref(filters, {
+        bookingSort: "amount-high",
+        verificationSort: "amount-high",
+        bookingSearch: "",
+        verificationSearch: "",
+      }),
+    },
+    {
       label: "Money in flight",
       href: buildAdminHref(filters, {
         listingFilter: "active",
@@ -360,6 +475,15 @@ export default async function AdminPage({
         listingSort: "newest",
         bookingSort: "amount-high",
         verificationSort: "amount-high",
+      }),
+    },
+    {
+      label: "Payment chase",
+      href: buildAdminHref(filters, {
+        bookingPayment: "chase",
+        bookingFilter: "all",
+        bookingSort: "amount-high",
+        bookingSearch: "",
       }),
     },
   ];
@@ -461,6 +585,11 @@ export default async function AdminPage({
               ) : null}
               {bookingSort !== "age" ? <input type="hidden" name="bookingSort" value={bookingSort} /> : null}
               {verificationSort !== "age" ? <input type="hidden" name="verificationSort" value={verificationSort} /> : null}
+              {listingAge !== "all" ? <input type="hidden" name="listingAge" value={listingAge} /> : null}
+              {bookingAge !== "all" ? <input type="hidden" name="bookingAge" value={bookingAge} /> : null}
+              {verificationAge !== "all" ? <input type="hidden" name="verificationAge" value={verificationAge} /> : null}
+              {bookingWindow !== "all" ? <input type="hidden" name="bookingWindow" value={bookingWindow} /> : null}
+              {bookingPayment !== "all" ? <input type="hidden" name="bookingPayment" value={bookingPayment} /> : null}
               <input
                 type="search"
                 name="listingSearch"
@@ -568,6 +697,11 @@ export default async function AdminPage({
               ) : null}
               {listingSort !== "age" ? <input type="hidden" name="listingSort" value={listingSort} /> : null}
               {verificationSort !== "age" ? <input type="hidden" name="verificationSort" value={verificationSort} /> : null}
+              {listingAge !== "all" ? <input type="hidden" name="listingAge" value={listingAge} /> : null}
+              {bookingAge !== "all" ? <input type="hidden" name="bookingAge" value={bookingAge} /> : null}
+              {verificationAge !== "all" ? <input type="hidden" name="verificationAge" value={verificationAge} /> : null}
+              {bookingWindow !== "all" ? <input type="hidden" name="bookingWindow" value={bookingWindow} /> : null}
+              {bookingPayment !== "all" ? <input type="hidden" name="bookingPayment" value={bookingPayment} /> : null}
               {bookingFilter !== "requested" ? <input type="hidden" name="bookingFilter" value={bookingFilter} /> : null}
               <input
                 type="search"
@@ -621,7 +755,15 @@ export default async function AdminPage({
                       </span>
                     </div>
                     <p className="mt-2 text-sm text-slate-400">{booking.customerName}</p>
-                    <p className="mt-3 text-sm font-medium text-slate-200">{formatCurrency(booking.totalAmount)}</p>
+                    <p className="mt-1 text-sm text-slate-400">
+                      {formatDate(booking.startDate)} to {formatDate(booking.endDate)}
+                    </p>
+                    <div className="mt-3 flex items-center gap-2 text-sm">
+                      <span className="rounded-full bg-slate-700 px-3 py-1 text-[11px] font-medium text-slate-200">
+                        {booking.paymentStatus.replaceAll("_", " ")}
+                      </span>
+                      <span className="font-medium text-slate-200">{formatCurrency(booking.totalAmount)}</span>
+                    </div>
 
                     <div className="mt-4 flex flex-wrap gap-3">
                       <Link
@@ -671,6 +813,11 @@ export default async function AdminPage({
               {bookingSearch ? <input type="hidden" name="bookingSearch" value={filters.bookingSearch ?? ""} /> : null}
               {listingSort !== "age" ? <input type="hidden" name="listingSort" value={listingSort} /> : null}
               {bookingSort !== "age" ? <input type="hidden" name="bookingSort" value={bookingSort} /> : null}
+              {listingAge !== "all" ? <input type="hidden" name="listingAge" value={listingAge} /> : null}
+              {bookingAge !== "all" ? <input type="hidden" name="bookingAge" value={bookingAge} /> : null}
+              {verificationAge !== "all" ? <input type="hidden" name="verificationAge" value={verificationAge} /> : null}
+              {bookingWindow !== "all" ? <input type="hidden" name="bookingWindow" value={bookingWindow} /> : null}
+              {bookingPayment !== "all" ? <input type="hidden" name="bookingPayment" value={bookingPayment} /> : null}
               {verificationFilter !== "pending" ? (
                 <input type="hidden" name="verificationFilter" value={verificationFilter} />
               ) : null}
@@ -728,7 +875,12 @@ export default async function AdminPage({
                       </span>
                     </div>
                     <p className="mt-2 text-sm text-slate-400">{booking.listingTitle}</p>
-                    <p className="mt-3 text-sm font-medium text-slate-200">{formatCurrency(booking.totalAmount)}</p>
+                    <div className="mt-3 flex items-center gap-2 text-sm">
+                      <span className="rounded-full bg-slate-700 px-3 py-1 text-[11px] font-medium text-slate-200">
+                        {booking.paymentStatus.replaceAll("_", " ")}
+                      </span>
+                      <span className="font-medium text-slate-200">{formatCurrency(booking.totalAmount)}</span>
+                    </div>
 
                     <div className="mt-4 flex flex-wrap gap-3">
                       <Link

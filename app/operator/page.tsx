@@ -10,6 +10,10 @@ type OperatorFilters = {
   bookingSearch?: string;
   listingSort?: string;
   bookingSort?: string;
+  listingAge?: string;
+  bookingAge?: string;
+  bookingWindow?: string;
+  bookingPayment?: string;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -46,7 +50,7 @@ function getTimestamp(value?: string | null) {
   return value ? new Date(value).getTime() : 0;
 }
 
-function getAgeMeta(value?: string | null, staleAfterDays = 3) {
+function getAgeDays(value?: string | null) {
   if (!value) {
     return null;
   }
@@ -57,7 +61,19 @@ function getAgeMeta(value?: string | null, staleAfterDays = 3) {
     return null;
   }
 
-  const diffDays = Math.floor(diffMs / DAY_MS);
+  return Math.floor(diffMs / DAY_MS);
+}
+
+function getLocalDayKey(value: string) {
+  return new Date(value).toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+}
+
+function getAgeMeta(value?: string | null, staleAfterDays = 3) {
+  const diffDays = getAgeDays(value);
+
+  if (diffDays === null) {
+    return null;
+  }
   const label = diffDays === 0 ? "new today" : diffDays === 1 ? "1d old" : `${diffDays}d old`;
 
   if (diffDays >= staleAfterDays) {
@@ -88,6 +104,10 @@ function buildOperatorHref(current: OperatorFilters, updates: Partial<Record<key
   const bookingFilter = next.bookingFilter ?? "all";
   const listingSort = next.listingSort ?? "newest";
   const bookingSort = next.bookingSort ?? "age";
+  const listingAge = next.listingAge ?? "all";
+  const bookingAge = next.bookingAge ?? "all";
+  const bookingWindow = next.bookingWindow ?? "all";
+  const bookingPayment = next.bookingPayment ?? "all";
   const listingSearch = next.listingSearch?.trim() ?? "";
   const bookingSearch = next.bookingSearch?.trim() ?? "";
 
@@ -105,6 +125,22 @@ function buildOperatorHref(current: OperatorFilters, updates: Partial<Record<key
 
   if (bookingSearch) {
     params.set("bookingSearch", bookingSearch);
+  }
+
+  if (listingAge !== "all") {
+    params.set("listingAge", listingAge);
+  }
+
+  if (bookingAge !== "all") {
+    params.set("bookingAge", bookingAge);
+  }
+
+  if (bookingWindow !== "all") {
+    params.set("bookingWindow", bookingWindow);
+  }
+
+  if (bookingPayment !== "all") {
+    params.set("bookingPayment", bookingPayment);
   }
 
   if (listingSort !== "newest") {
@@ -134,6 +170,11 @@ export default async function OperatorPage({
   const bookingSearch = filters.bookingSearch?.trim().toLowerCase() ?? "";
   const listingSort = filters.listingSort ?? "newest";
   const bookingSort = filters.bookingSort ?? "age";
+  const listingAge = filters.listingAge ?? "all";
+  const bookingAge = filters.bookingAge ?? "all";
+  const bookingWindow = filters.bookingWindow ?? "all";
+  const bookingPayment = filters.bookingPayment ?? "all";
+  const todayKey = getLocalDayKey(new Date().toISOString());
 
   const filteredListings = data.listings.filter((listing) => {
     const matchesSearch =
@@ -144,6 +185,13 @@ export default async function OperatorPage({
 
     if (!matchesSearch) {
       return false;
+    }
+
+    if (listingAge === "48h") {
+      const ageDays = getAgeDays(listing.createdAt);
+      if (ageDays === null || ageDays < 2) {
+        return false;
+      }
     }
 
     switch (listingFilter) {
@@ -183,6 +231,21 @@ export default async function OperatorPage({
       );
 
     if (!matchesSearch) {
+      return false;
+    }
+
+    if (bookingAge === "48h") {
+      const ageDays = getAgeDays(booking.createdAt);
+      if (ageDays === null || ageDays < 2) {
+        return false;
+      }
+    }
+
+    if (bookingWindow === "today" && getLocalDayKey(booking.startDate) !== todayKey) {
+      return false;
+    }
+
+    if (bookingPayment === "chase" && booking.paymentStatus === "CAPTURED") {
       return false;
     }
 
@@ -277,6 +340,25 @@ export default async function OperatorPage({
       }),
     },
     {
+      label: "Today only",
+      href: buildOperatorHref(filters, {
+        bookingWindow: "today",
+        bookingSort: "start-soon",
+        bookingSearch: "",
+      }),
+    },
+    {
+      label: "48h stale",
+      href: buildOperatorHref(filters, {
+        listingAge: "48h",
+        bookingAge: "48h",
+        listingSort: "age",
+        bookingSort: "age",
+        listingSearch: "",
+        bookingSearch: "",
+      }),
+    },
+    {
       label: "Rejected cleanup",
       href: buildOperatorHref(filters, {
         listingFilter: "rejected",
@@ -295,6 +377,15 @@ export default async function OperatorPage({
         listingSort: "rate-high",
         bookingSort: "amount-high",
         listingSearch: "",
+        bookingSearch: "",
+      }),
+    },
+    {
+      label: "Payment chase",
+      href: buildOperatorHref(filters, {
+        bookingPayment: "chase",
+        bookingFilter: "all",
+        bookingSort: "amount-high",
         bookingSearch: "",
       }),
     },
@@ -400,6 +491,10 @@ export default async function OperatorPage({
                 {bookingFilter !== "all" ? <input type="hidden" name="bookingFilter" value={bookingFilter} /> : null}
                 {bookingSearch ? <input type="hidden" name="bookingSearch" value={filters.bookingSearch ?? ""} /> : null}
                 {bookingSort !== "age" ? <input type="hidden" name="bookingSort" value={bookingSort} /> : null}
+                {listingAge !== "all" ? <input type="hidden" name="listingAge" value={listingAge} /> : null}
+                {bookingAge !== "all" ? <input type="hidden" name="bookingAge" value={bookingAge} /> : null}
+                {bookingWindow !== "all" ? <input type="hidden" name="bookingWindow" value={bookingWindow} /> : null}
+                {bookingPayment !== "all" ? <input type="hidden" name="bookingPayment" value={bookingPayment} /> : null}
                 <input
                   type="search"
                   name="listingSearch"
@@ -514,6 +609,10 @@ export default async function OperatorPage({
                 {listingFilter !== "all" ? <input type="hidden" name="listingFilter" value={listingFilter} /> : null}
                 {listingSearch ? <input type="hidden" name="listingSearch" value={filters.listingSearch ?? ""} /> : null}
                 {listingSort !== "newest" ? <input type="hidden" name="listingSort" value={listingSort} /> : null}
+                {listingAge !== "all" ? <input type="hidden" name="listingAge" value={listingAge} /> : null}
+                {bookingAge !== "all" ? <input type="hidden" name="bookingAge" value={bookingAge} /> : null}
+                {bookingWindow !== "all" ? <input type="hidden" name="bookingWindow" value={bookingWindow} /> : null}
+                {bookingPayment !== "all" ? <input type="hidden" name="bookingPayment" value={bookingPayment} /> : null}
                 {bookingFilter !== "all" ? <input type="hidden" name="bookingFilter" value={bookingFilter} /> : null}
                 <input
                   type="search"
@@ -577,7 +676,12 @@ export default async function OperatorPage({
                       <span className="text-slate-400">
                         Verification: <span className="text-slate-200">{booking.verificationStatus.replaceAll("_", " ")}</span>
                       </span>
-                      <span className="font-medium text-slate-200">{formatCurrency(booking.totalAmount)}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-full bg-slate-700 px-3 py-1 text-[11px] font-medium text-slate-200">
+                          {booking.paymentStatus.replaceAll("_", " ")}
+                        </span>
+                        <span className="font-medium text-slate-200">{formatCurrency(booking.totalAmount)}</span>
+                      </div>
                     </div>
 
                     <div className="mt-4 flex flex-wrap gap-3">

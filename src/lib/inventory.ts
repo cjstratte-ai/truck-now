@@ -155,6 +155,8 @@ export type AdminBookingReview = {
   listingTitle: string;
   customerName: string;
   createdAt?: string | null;
+  startDate: string;
+  endDate: string;
   status: string;
   verificationStatus: string;
   totalAmount: number;
@@ -594,6 +596,8 @@ function mapAdminBookingReview(booking: BookingRecord): AdminBookingReview {
     listingTitle: booking.listingTitle,
     customerName: booking.customerName,
     createdAt: booking.createdAt,
+    startDate: booking.startDate,
+    endDate: booking.endDate,
     status: booking.status,
     verificationStatus: booking.verificationStatus,
     totalAmount: booking.totalAmount,
