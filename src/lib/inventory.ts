@@ -32,6 +32,11 @@ export type CustomerInventoryData = {
   bookings: CustomerBookingSummary[];
 };
 
+export type CustomerBookingsData = {
+  sourceLabel: string;
+  bookings: CustomerBookingSummary[];
+};
+
 export type CustomerListingDetail = {
   sourceLabel: string;
   listing: InventoryItem;
@@ -986,6 +991,28 @@ export async function getCustomerInventoryData(customerEmail?: string): Promise<
             totalAmount: booking.totalAmount,
           }))
       : [],
+  };
+}
+
+export async function getCustomerBookingsData(customerEmail: string): Promise<CustomerBookingsData> {
+  const { source, bookings } = await loadCatalog();
+
+  return {
+    sourceLabel: getSourceLabel(source, "customer bookings"),
+    bookings: bookings
+      .filter((booking) => booking.customerEmail === customerEmail)
+      .map((booking) => ({
+        id: booking.id,
+        listingId: booking.listingId,
+        listingTitle: booking.listingTitle,
+        city: booking.city,
+        startDate: booking.startDate,
+        endDate: booking.endDate,
+        status: booking.status,
+        verificationStatus: booking.verificationStatus,
+        paymentStatus: booking.paymentStatus,
+        totalAmount: booking.totalAmount,
+      })),
   };
 }
 

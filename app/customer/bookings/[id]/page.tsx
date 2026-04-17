@@ -109,8 +109,8 @@ export default async function CustomerBookingDetailPage({
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-6 py-16 text-white">
-      <Link href="/customer" className="text-sm text-orange-300 transition hover:text-orange-200">
-        ← Back to inventory
+      <Link href="/customer/bookings" className="text-sm text-orange-300 transition hover:text-orange-200">
+        ← Back to bookings
       </Link>
 
       <div className="mt-6 rounded-3xl border border-slate-800 bg-slate-900 p-8">

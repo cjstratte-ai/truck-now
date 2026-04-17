@@ -60,9 +60,17 @@ export default async function CustomerPage() {
               <h2 className="text-2xl font-semibold">Your bookings</h2>
               <p className="mt-2 text-sm text-slate-400">Track the current status lane before you reach out about timing, payment, or pickup.</p>
             </div>
-            <span className="rounded-full border border-slate-700 px-3 py-1 text-sm text-slate-300">
-              {data.bookings.length} recent {data.bookings.length === 1 ? "booking" : "bookings"}
-            </span>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="rounded-full border border-slate-700 px-3 py-1 text-sm text-slate-300">
+                {data.bookings.length} recent {data.bookings.length === 1 ? "booking" : "bookings"}
+              </span>
+              <Link
+                href="/customer/bookings"
+                className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:border-slate-500"
+              >
+                Open all bookings
+              </Link>
+            </div>
           </div>
 
           {data.bookings.length > 0 ? (
