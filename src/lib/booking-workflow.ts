@@ -27,6 +27,14 @@ export type NotificationPreview = {
   sentAt: string | null;
 };
 
+export type BookingWorkflowSummary = {
+  tone: "warning" | "success" | "danger" | "neutral";
+  title: string;
+  detail: string;
+  nextAction: string;
+  owner: string;
+};
+
 export function getRentalDays(startDate: string, endDate: string) {
   const start = new Date(startDate);
   const end = new Date(endDate);
@@ -213,6 +221,88 @@ export function getPaymentSummary(booking: BookingWorkflowSnapshot) {
     operatorPayout,
     label: "Payment blocked",
     note: "Payment is not ready yet. Finish the booking and verification workflow before collecting funds.",
+  };
+}
+
+export function getBookingWorkflowSummary(booking: BookingWorkflowSnapshot): BookingWorkflowSummary {
+  if (booking.verificationStatus === "REJECTED") {
+    return {
+      tone: "danger",
+      title: "Workflow blocked by verification",
+      detail: "Verification was rejected, so the booking should stay out of approval and payment until that blocker is resolved or the rejection is confirmed.",
+      nextAction:
+        booking.customerNotificationState === "PENDING"
+          ? "Send the customer-facing verification update, then decide whether this booking should stay closed or be reopened with new documents."
+          : "Confirm the rejection path and only reopen the booking if new verification documents arrive.",
+      owner: "Admin / Ops",
+    };
+  }
+
+  if (booking.status === "REJECTED") {
+    return {
+      tone: "danger",
+      title: "Booking closed",
+      detail: "This booking has been rejected and is no longer moving toward payment or handoff.",
+      nextAction:
+        booking.customerNotificationState === "PENDING" || booking.opsNotificationState === "PENDING"
+          ? "Send the queued rejection updates so the customer and ops lanes match the booking record."
+          : "Use the timeline as the source of truth and reopen availability only if the truck should go back into the market.",
+      owner: "Admin / Ops",
+    };
+  }
+
+  if (booking.status === "REQUESTED" && booking.verificationStatus === "PENDING") {
+    return {
+      tone: "warning",
+      title: "Waiting on verification before approval",
+      detail: "The booking is still requested, and verification has not cleared yet. Approval should stay behind that checkpoint.",
+      nextAction: "Clear or reject verification first, then return here for the booking decision.",
+      owner: "Admin",
+    };
+  }
+
+  if (booking.status === "REQUESTED") {
+    return {
+      tone: "warning",
+      title: "Ready for a booking decision",
+      detail: "The booking is still in the request lane and can now move forward or be closed with context.",
+      nextAction: "Approve to move the workflow into payment capture, or reject with a clear note for the timeline.",
+      owner: "Ops / Admin",
+    };
+  }
+
+  if (booking.status === "APPROVED" && booking.paymentStatus === "PENDING_CAPTURE") {
+    return {
+      tone: "warning",
+      title: "Approved, payment is the next gate",
+      detail: "Approval is done, but the rental is not handoff-ready until payment is captured and the follow-up updates are sent.",
+      nextAction:
+        booking.customerNotificationState === "PENDING"
+          ? "Send the payment instructions, then capture payment with a real reference as soon as it lands."
+          : "Capture payment with the real reference, then make sure ops has the handoff-ready update queued.",
+      owner: "Ops",
+    };
+  }
+
+  if (booking.paymentStatus === "CAPTURED" || booking.status === "PAID") {
+    return {
+      tone: "success",
+      title: "Paid and ready for handoff planning",
+      detail: "Payment is captured, so the booking can move out of queue work and into pickup, keys, and return coordination.",
+      nextAction:
+        booking.opsNotificationState === "PENDING"
+          ? "Send the handoff-ready ops update, then lock in pickup and return instructions."
+          : "Use the detail page to keep pickup timing, keys, and return steps aligned across the team.",
+      owner: "Ops",
+    };
+  }
+
+  return {
+    tone: "neutral",
+    title: "Workflow update pending",
+    detail: "This booking is in motion, but the next owner should confirm the latest status and notifications before acting.",
+    nextAction: "Use the detail page as the source of truth before messaging the customer or changing status again.",
+    owner: "Ops / Admin",
   };
 }
 

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import {
   formatCurrency,
+  getBookingWorkflowSummary,
   getCustomerNotificationPreview,
   getPaymentSummary,
 } from "@/src/lib/booking-workflow";
@@ -51,6 +52,19 @@ function formatLabel(value: string) {
   return value.toLowerCase().replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function getSummaryClasses(tone: "warning" | "success" | "danger" | "neutral") {
+  switch (tone) {
+    case "success":
+      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-100";
+    case "danger":
+      return "border-rose-500/30 bg-rose-500/10 text-rose-100";
+    case "warning":
+      return "border-amber-500/30 bg-amber-500/10 text-amber-100";
+    default:
+      return "border-slate-700 bg-slate-900 text-slate-100";
+  }
+}
+
 export default async function CustomerBookingDetailPage({
   params,
   searchParams,
@@ -68,6 +82,25 @@ export default async function CustomerBookingDetailPage({
   }
 
   const flash = getWorkflowFlash(resolvedSearchParams.message);
+  const workflowSummary = getBookingWorkflowSummary({
+    listingTitle: data.booking.listingTitle,
+    customerName: data.booking.customerName,
+    customerEmail: data.booking.customerEmail,
+    startDate: data.booking.startDate,
+    endDate: data.booking.endDate,
+    totalAmount: data.booking.totalAmount,
+    status: data.booking.status,
+    verificationStatus: data.booking.verificationStatus,
+    paymentStatus: data.booking.paymentStatus,
+    paymentCapturedAt: data.booking.paymentCapturedAt,
+    paymentReference: data.booking.paymentReference,
+    customerNotificationKind: data.booking.customerNotificationKind,
+    customerNotificationState: data.booking.customerNotificationState,
+    customerNotificationSentAt: data.booking.customerNotificationSentAt,
+    opsNotificationKind: data.booking.opsNotificationKind,
+    opsNotificationState: data.booking.opsNotificationState,
+    opsNotificationSentAt: data.booking.opsNotificationSentAt,
+  });
   const paymentSummary = getPaymentSummary({
     listingTitle: data.booking.listingTitle,
     customerName: data.booking.customerName,
@@ -122,6 +155,9 @@ export default async function CustomerBookingDetailPage({
           <span className="rounded-full border border-slate-700 px-3 py-1 text-sm text-slate-300">
             Verification: {formatLabel(data.booking.verificationStatus)}
           </span>
+          <span className="rounded-full border border-slate-700 px-3 py-1 text-sm text-slate-300">
+            Payment: {formatLabel(data.booking.paymentStatus)}
+          </span>
         </div>
 
         <div className="mt-5 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -155,6 +191,20 @@ export default async function CustomerBookingDetailPage({
       </div>
 
       {flash ? <div className={`mt-6 rounded-2xl border px-4 py-3 text-sm ${getFlashClasses(flash.tone)}`}>{flash.text}</div> : null}
+
+      <section className={`mt-6 rounded-2xl border p-5 ${getSummaryClasses(workflowSummary.tone)}`}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] opacity-70">Workflow summary</p>
+            <h2 className="mt-2 text-xl font-semibold">{workflowSummary.title}</h2>
+          </div>
+          <span className="rounded-full border border-current/20 px-3 py-1 text-xs uppercase tracking-wide opacity-80">
+            Owner: {workflowSummary.owner}
+          </span>
+        </div>
+        <p className="mt-3 text-sm opacity-90">{workflowSummary.detail}</p>
+        <p className="mt-3 text-sm font-medium">Next: {workflowSummary.nextAction}</p>
+      </section>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
         <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">

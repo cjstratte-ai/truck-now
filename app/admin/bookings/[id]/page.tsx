@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { sendBookingNotification, updateBookingStatus, updateVerificationStatus } from "@/app/actions";
 import {
   formatCurrency,
+  getBookingWorkflowSummary,
   getCustomerNotificationPreview,
   getOpsNotificationPreview,
   getPaymentSummary,
@@ -48,6 +49,19 @@ function getStatusClasses(status: string) {
   }
 }
 
+function getSummaryClasses(tone: "warning" | "success" | "danger" | "neutral") {
+  switch (tone) {
+    case "success":
+      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-100";
+    case "danger":
+      return "border-rose-500/30 bg-rose-500/10 text-rose-100";
+    case "warning":
+      return "border-amber-500/30 bg-amber-500/10 text-amber-100";
+    default:
+      return "border-slate-700 bg-slate-900 text-slate-100";
+  }
+}
+
 export default async function AdminBookingReviewPage({
   params,
   searchParams,
@@ -67,8 +81,12 @@ export default async function AdminBookingReviewPage({
   const flash = getWorkflowFlash(resolvedSearchParams.message);
   const isDemoMode = data.sourceLabel.startsWith("Sample");
   const paymentSummary = getPaymentSummary(data.booking);
+  const workflowSummary = getBookingWorkflowSummary(data.booking);
   const customerNotification = getCustomerNotificationPreview(data.booking);
   const opsNotification = getOpsNotificationPreview(data.booking);
+  const canApproveBooking = data.booking.status === "REQUESTED" && data.booking.verificationStatus !== "REJECTED";
+  const canRejectBooking = data.booking.status !== "PAID" && data.booking.status !== "REJECTED";
+  const canCapturePayment = data.booking.status === "APPROVED" && data.booking.paymentStatus === "PENDING_CAPTURE";
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-6 py-16 text-white">
@@ -110,6 +128,20 @@ export default async function AdminBookingReviewPage({
       </div>
 
       {flash ? <div className={`mt-6 rounded-2xl border px-4 py-3 text-sm ${getFlashClasses(flash.tone)}`}>{flash.text}</div> : null}
+
+      <section className={`mt-6 rounded-2xl border p-5 ${getSummaryClasses(workflowSummary.tone)}`}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] opacity-70">Workflow summary</p>
+            <h2 className="mt-2 text-xl font-semibold">{workflowSummary.title}</h2>
+          </div>
+          <span className="rounded-full border border-current/20 px-3 py-1 text-xs uppercase tracking-wide opacity-80">
+            Owner: {workflowSummary.owner}
+          </span>
+        </div>
+        <p className="mt-3 text-sm opacity-90">{workflowSummary.detail}</p>
+        <p className="mt-3 text-sm font-medium">Next: {workflowSummary.nextAction}</p>
+      </section>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_1fr]">
         <section className="space-y-6">
@@ -169,44 +201,44 @@ export default async function AdminBookingReviewPage({
             </div>
 
             <div className="mt-6 flex flex-wrap gap-3">
-              {data.booking.status === "REQUESTED" ? (
-                <>
-                  <form action={updateBookingStatus}>
-                    <input type="hidden" name="bookingId" value={data.booking.id} />
-                    <input type="hidden" name="nextStatus" value="APPROVED" />
-                    <input type="hidden" name="returnTo" value={`/admin/bookings/${data.booking.id}`} />
-                    <button
-                      type="submit"
-                      className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-emerald-400"
-                    >
-                      Approve booking
-                    </button>
-                  </form>
-
-                  <form action={updateBookingStatus} className="flex w-full flex-col gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4 sm:w-auto">
-                    <input type="hidden" name="bookingId" value={data.booking.id} />
-                    <input type="hidden" name="nextStatus" value="REJECTED" />
-                    <input type="hidden" name="returnTo" value={`/admin/bookings/${data.booking.id}`} />
-                    <label className="text-xs uppercase tracking-wide text-slate-500">
-                      Decision note
-                      <textarea
-                        name="statusNote"
-                        rows={3}
-                        placeholder="Optional context for why the booking was rejected. This will show in the booking timeline."
-                        className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-rose-400"
-                      />
-                    </label>
-                    <button
-                      type="submit"
-                      className="rounded-lg bg-rose-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-rose-400"
-                    >
-                      Reject booking
-                    </button>
-                  </form>
-                </>
+              {canApproveBooking ? (
+                <form action={updateBookingStatus}>
+                  <input type="hidden" name="bookingId" value={data.booking.id} />
+                  <input type="hidden" name="nextStatus" value="APPROVED" />
+                  <input type="hidden" name="returnTo" value={`/admin/bookings/${data.booking.id}`} />
+                  <button
+                    type="submit"
+                    className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-emerald-400"
+                  >
+                    Approve booking
+                  </button>
+                </form>
               ) : null}
 
-              {data.booking.status === "APPROVED" && data.booking.paymentStatus === "PENDING_CAPTURE" ? (
+              {canRejectBooking ? (
+                <form action={updateBookingStatus} className="flex w-full flex-col gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4 sm:w-auto">
+                  <input type="hidden" name="bookingId" value={data.booking.id} />
+                  <input type="hidden" name="nextStatus" value="REJECTED" />
+                  <input type="hidden" name="returnTo" value={`/admin/bookings/${data.booking.id}`} />
+                  <label className="text-xs uppercase tracking-wide text-slate-500">
+                    Decision note
+                    <textarea
+                      name="statusNote"
+                      rows={3}
+                      placeholder="Optional context for why the booking was rejected. This will show in the booking timeline."
+                      className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-rose-400"
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    className="rounded-lg bg-rose-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-rose-400"
+                  >
+                    Reject booking
+                  </button>
+                </form>
+              ) : null}
+
+              {canCapturePayment ? (
                 <form action={updateBookingStatus} className="flex w-full flex-col gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4 sm:w-auto">
                   <input type="hidden" name="bookingId" value={data.booking.id} />
                   <input type="hidden" name="nextStatus" value="PAID" />
