@@ -902,7 +902,7 @@ export async function updateBookingStatus(formData: FormData) {
         ...getNotificationFlowForBookingStatus(nextStatus),
       };
     } else if (nextStatus === "REJECTED") {
-      if (currentBooking.status === "PAID") {
+      if (currentBooking.status === "PAID" || currentBooking.status === "REJECTED") {
         redirect(getRedirectUrl(returnTo, "booking-status-failed"));
       }
 
@@ -1026,7 +1026,7 @@ export async function bulkUpdateOperatorBookings(formData: FormData) {
         return booking.status === "REQUESTED" && booking.verificationStatus !== "REJECTED";
       }
 
-      return booking.status !== "PAID";
+      return booking.status !== "PAID" && booking.status !== "REJECTED";
     });
 
     if (eligibleBookings.length === 0) {
@@ -1142,7 +1142,7 @@ export async function bulkUpdateBookingStatuses(formData: FormData) {
         return booking.status === "REQUESTED" && booking.verificationStatus !== "REJECTED";
       }
 
-      return booking.status !== "PAID";
+      return booking.status !== "PAID" && booking.status !== "REJECTED";
     });
 
     if (eligibleBookings.length === 0) {

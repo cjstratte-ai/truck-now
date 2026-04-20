@@ -124,7 +124,7 @@ function getOperatorBulkMessageMeta(message?: string) {
       return {
         tone: "success" as const,
         title: "Bookings rejected",
-        detail: "Selected booking requests were rejected.",
+        detail: "Eligible bookings were rejected.",
       };
     case "bulk-operator-listing-failed":
       return {
@@ -390,7 +390,7 @@ export default async function OperatorPage({
 
   const bookingBulkReadyCounts = {
     approve: sortedBookings.filter((booking) => booking.status === "REQUESTED" && booking.verificationStatus !== "REJECTED").length,
-    reject: sortedBookings.filter((booking) => booking.status !== "PAID").length,
+    reject: sortedBookings.filter((booking) => booking.status !== "PAID" && booking.status !== "REJECTED").length,
   };
 
   const listingFilters = [
@@ -997,7 +997,7 @@ export default async function OperatorPage({
                       data-bulk-tags={
                         booking.status === "REQUESTED" && booking.verificationStatus !== "REJECTED"
                           ? "approve,reject"
-                          : booking.status !== "PAID"
+                          : booking.status !== "PAID" && booking.status !== "REJECTED"
                             ? "reject"
                             : ""
                       }
@@ -1021,8 +1021,11 @@ export default async function OperatorPage({
                         {booking.status === "REQUESTED" && booking.verificationStatus !== "REJECTED" ? (
                           <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-emerald-200">Bulk approve ready</span>
                         ) : null}
-                        {booking.status !== "PAID" ? (
+                        {booking.status !== "PAID" && booking.status !== "REJECTED" ? (
                           <span className="rounded-full border border-rose-500/30 bg-rose-500/10 px-3 py-1 text-rose-200">Bulk reject ready</span>
+                        ) : null}
+                        {booking.status === "REJECTED" ? (
+                          <span className="rounded-full border border-slate-800 px-3 py-1 text-slate-500">Already rejected</span>
                         ) : null}
                         {booking.status === "PAID" ? (
                           <span className="rounded-full border border-slate-800 px-3 py-1 text-slate-500">Paid bookings stay single-item</span>
